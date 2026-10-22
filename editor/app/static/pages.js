@@ -125,7 +125,7 @@ function renderPageFile() {
     ? (file.updatedAt
       ? t("pages.editedAt", { when: new Date(file.updatedAt).toLocaleString(i18n.lang === "ko" ? "ko-KR" : "en-US") })
       : t("home.pageCustom"))
-    : t("pages.original");
+    : t(pageEditor.mode === "home" ? "home.pageAuto" : "pages.original");
   $("page-stale").hidden = !file.stale;
   $("page-original").textContent = file.original ?? t("pages.missing");
   $("page-text").value = file.edited ?? file.original ?? "";
@@ -141,7 +141,12 @@ function loadAsciidoctor() {
   asciidoctorLoading ??= new Promise((resolve, reject) => {
     const script = document.createElement("script");
     script.src = ASCIIDOCTOR_URL;
-    script.onload = () => resolve(window.Asciidoctor());
+    script.onload = () => {
+      // 3.x 의 minified 브라우저 빌드는 window.Asciidoctor 대신 이 전역 이름으로 팩토리를 둔다
+      const factory = window.Asciidoctor || window.module$build$asciidoctor_browser?.default;
+      if (typeof factory === "function") resolve(factory());
+      else { asciidoctorLoading = null; reject(new Error("Asciidoctor factory not found")); }
+    };
     script.onerror = () => { asciidoctorLoading = null; reject(new Error(ASCIIDOCTOR_URL)); };
     document.head.append(script);
   });
