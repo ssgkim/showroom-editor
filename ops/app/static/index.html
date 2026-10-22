@@ -30,12 +30,12 @@
     </div>
   </header>
   <nav class="hub-nav" aria-label="Sections">
-    <button type="button" aria-current="page" data-i18n="nav.preflight"></button>
-    <button type="button" disabled><span data-i18n="nav.gallery"></span><span class="soon" data-i18n="nav.soon"></span></button>
-    <button type="button" disabled><span data-i18n="nav.progress"></span><span class="soon" data-i18n="nav.soon"></span></button>
+    <button type="button" data-view="preflight" data-i18n="nav.preflight"></button>
+    <button type="button" data-view="gallery" data-i18n="nav.gallery"></button>
+    <button type="button" data-view="progress" data-i18n="nav.progress"></button>
   </nav>
 
-  <main class="layout ops-layout">
+  <main class="layout ops-layout" data-view-panel="preflight">
     <section class="panel" aria-labelledby="ws-heading">
       <header class="panel-head">
         <p class="step">01</p>
@@ -72,8 +72,41 @@
     </section>
   </main>
 
+  <main class="view-wide" data-view-panel="gallery" hidden>
+    <header class="view-head">
+      <div>
+        <h2 data-i18n="gallery.heading"></h2>
+        <p class="panel-desc" data-i18n="gallery.desc"></p>
+      </div>
+      <div class="segmented" role="group" aria-label="Filter">
+        <button type="button" data-gallery-filter="all" data-i18n="gallery.filterAll"></button>
+        <button type="button" data-gallery-filter="live" data-i18n="gallery.filterLive"></button>
+      </div>
+    </header>
+    <div id="gallery-grid" class="gallery-grid" aria-live="polite"></div>
+  </main>
+
+  <main class="view-wide" data-view-panel="progress" hidden>
+    <header class="view-head">
+      <div>
+        <h2 data-i18n="progress.heading"></h2>
+        <p class="panel-desc" data-i18n="progress.desc"></p>
+      </div>
+      <div class="progress-tools">
+        <label class="inline-field"><span data-i18n="progress.workshop"></span>
+          <select id="progress-workshop"></select>
+        </label>
+        <label class="inline-check"><input type="checkbox" id="progress-auto"> <span data-i18n="progress.auto"></span></label>
+        <button type="button" class="btn btn-red" id="btn-progress-run" data-i18n="progress.run"></button>
+      </div>
+    </header>
+    <div id="progress-area" aria-live="polite"></div>
+  </main>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="/static/i18n.js" defer></script>
   <script src="/static/app.js" defer></script>
+  <script src="/static/gallery.js" defer></script>
+  <script src="/static/progress.js" defer></script>
 </body>
 </html>

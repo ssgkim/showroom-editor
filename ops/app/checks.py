@@ -35,9 +35,18 @@ class Context:
             self._cache[key] = loader()
         return self._cache[key]
 
+    def placeholders(self) -> dict[str, str]:
+        number = re.search(r"(\d+)$", self.user)
+        digits = number.group(1) if number else ""
+        return {"{{ .domain }}": self.domain, "{{ .user }}": self.user,
+                "{{ .userNumber }}": str(int(digits)) if digits else "",
+                "{{ .userNumber2 }}": f"{int(digits):02d}" if digits else ""}
+
     def render(self, value: object) -> object:
         if isinstance(value, str):
-            return value.replace("{{ .domain }}", self.domain).replace("{{ .user }}", self.user)
+            for placeholder, replacement in self.placeholders().items():
+                value = value.replace(placeholder, replacement)
+            return value
         if isinstance(value, dict):
             return {k: self.render(v) for k, v in value.items()}
         if isinstance(value, list):

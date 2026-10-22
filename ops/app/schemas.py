@@ -10,14 +10,16 @@ from pydantic import BaseModel, Field, ValidationError, model_validator
 
 CHECK_TYPES = ("operator", "clusterVersion", "gpuNodes", "resource", "http", "capacity")
 TEMPLATE_EXPR = re.compile(r"\{\{.*?\}\}")
-ALLOWED_PLACEHOLDERS = {"{{ .domain }}", "{{ .user }}"}
+# {{ .user }}=user3, {{ .userNumber }}=3, {{ .userNumber2 }}=03 (프로젝트 이름이 user-03 처럼 두 자리일 때)
+ALLOWED_PLACEHOLDERS = {"{{ .domain }}", "{{ .user }}", "{{ .userNumber }}", "{{ .userNumber2 }}"}
 
 
 def _check_placeholders(value: Any) -> None:
     if isinstance(value, str):
         unknown = [e for e in TEMPLATE_EXPR.findall(value) if e not in ALLOWED_PLACEHOLDERS]
         if unknown:
-            raise ValueError(f"허용되지 않는 자리표시자: {', '.join(unknown)} (사용 가능: {{{{ .domain }}}}, {{{{ .user }}}})")
+            allowed = ", ".join(sorted(ALLOWED_PLACEHOLDERS))
+            raise ValueError(f"허용되지 않는 자리표시자: {', '.join(unknown)} (사용 가능: {allowed})")
     elif isinstance(value, dict):
         for item in value.values():
             _check_placeholders(item)

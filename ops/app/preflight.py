@@ -19,13 +19,13 @@ def _result(scope: str, name: str, status: str, observed: str, fix: str = "") ->
     return {"scope": scope, "name": name, "status": status, "observed": observed, "fix": fix}
 
 
-def _expected_users(workshop: dict) -> list[str]:
+def expected_users(workshop: dict) -> list[str]:
     start, count = int(workshop["userStart"]), int(workshop["userCount"])
     return [f"user{i}" for i in range(start, start + count)]
 
 
 def _check_users(workshop: dict) -> dict:
-    expected = _expected_users(workshop)
+    expected = expected_users(workshop)
     name = f"사용자 계정 {expected[0]} ~ {expected[-1]}"
     try:
         realms = oc_json(["get", "keycloakrealmimports.k8s.keycloak.org", "-A"]).get("items", [])
@@ -108,7 +108,7 @@ def run(workshop_id: str, domain: str) -> dict:
         "workshop": workshop_id,
         "title": workshop["title"],
         "contents": workshop["contents"],
-        "users": _expected_users(workshop),
+        "users": expected_users(workshop),
         "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "summary": summary,
         "definitions": definitions,

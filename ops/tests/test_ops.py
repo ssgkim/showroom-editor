@@ -172,3 +172,84 @@ def test_links_point_to_editor_route(monkeypatch):
 
     assert response.json() == {"editor": "https://editor.apps.example.com"}
     assert calls[0][:5] == ["get", "route", "showroom-editor", "-n", "showroom-editor"]
+
+
+# ── 자리표시자 · 갤러리 · 진행 현황 ──────────────────────────────────────────
+def test_context_renders_user_number_placeholders():
+    ctx = checks.Context(domain="d", user="user3")
+
+    assert ctx.render("user-{{ .userNumber2 }}/{{ .userNumber }}/{{ .user }}") == "user-03/3/user3"
+
+
+def test_definition_accepts_user_number_placeholder():
+    text = "checkpoints: [{module: 2, name: p, check: {type: resource, kind: Namespace, name: 'user-{{ .userNumber2 }}'}}]"
+
+    assert parse_definition(text).checkpoints[0].check.model_dump()["name"] == "user-{{ .userNumber2 }}"
+
+
+def _state():
+    return {
+        "catalog": {"agentops": {"repoUrl": "https://g/a.git", "repoRef": "main", "title": "AgentOps"},
+                    "inference": {"repoUrl": "https://g/i.git", "repoRef": "main", "title": "Inference"}},
+        "workshops": {"ws": {"title": "W", "contents": ["agentops"], "userStart": 1, "userCount": 2}},
+        "deploy": {"workshop": "ws"}, "preview": None,
+    }
+
+
+DEFINITION_WITH_CHECKPOINTS = """
+about: {summary: s, duration: 90m}
+requirements: [{name: r, check: {type: gpuNodes}, severity: recommended}]
+checkpoints:
+  - {module: 2, name: 백엔드, check: {type: resource, kind: Deployment, namespace: "demo-{{ .user }}", name: b, ready: true}}
+"""
+
+
+def test_gallery_lists_catalog_with_definition_workshops_and_readiness(monkeypatch):
+    from app import definitions, gallery
+
+    monkeypatch.setattr(definitions, "_fetch_repo_file", lambda *_: None)
+    report = {"workshop": "ws", "at": "2026-10-22T10:00:00", "contents": ["agentops"],
+              "results": [{"scope": "agentops", "status": "warn"}, {"scope": "common", "status": "fail"}]}
+
+    cards = gallery.build(_state(), {"agentops": DEFINITION_WITH_CHECKPOINTS}, {"ws": report})
+
+    agentops = cards[0]
+    assert agentops["name"] == "agentops" and agentops["source"] == "override"
+    assert agentops["about"]["duration"] == "90m"
+    assert agentops["requirements"] == [{"name": "r", "severity": "recommended"}]
+    assert agentops["workshops"] == [{"id": "ws", "title": "W", "deployed": True}]
+    assert agentops["readiness"]["verdict"] == "caution"  # common 실패는 콘텐츠 판정에 넣지 않는다
+    assert cards[1]["readiness"] is None and cards[1]["workshops"] == []
+
+
+def test_progress_builds_user_by_checkpoint_matrix(monkeypatch):
+    from app import progress
+
+    monkeypatch.setattr(progress, "editor_state", _state)
+    monkeypatch.setattr(progress, "load_overrides", lambda: {"agentops": DEFINITION_WITH_CHECKPOINTS})
+    monkeypatch.setattr(progress, "showroom_status", lambda users: {u: "ready" for u in users})
+    seen = []
+
+    def fake_run(check_type, params, ctx):
+        seen.append(ctx.render(params["namespace"]))
+        return ctx.user == "user1", "Ready" if ctx.user == "user1" else "없음"
+    monkeypatch.setattr(checks, "run", fake_run)
+
+    result = progress.run("ws", "apps.example.com")
+
+    assert sorted(seen) == ["demo-user1", "demo-user2"]
+    assert [c["id"] for c in result["columns"]] == ["agentops:0"] and "check" not in result["columns"][0]
+    assert result["rows"][0]["cells"]["agentops:0"] == {"s": "done", "o": "Ready"}
+    assert result["rows"][1]["done"] == 0 and result["totals"] == {"agentops:0": 1}
+
+
+def test_showroom_status_reads_all_namespaces_once(monkeypatch):
+    from app import progress
+
+    items = [{"metadata": {"namespace": "showroom-user1"}, "status": {"availableReplicas": 1}},
+             {"metadata": {"namespace": "showroom-user2"}, "status": {}}]
+    calls = []
+    monkeypatch.setattr(progress, "oc_json", lambda args: calls.append(args) or {"items": items})
+
+    assert progress.showroom_status(["user1", "user2", "user3"]) == {"user1": "ready", "user2": "starting", "user3": "missing"}
+    assert len(calls) == 1

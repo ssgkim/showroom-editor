@@ -250,6 +250,7 @@ function bindEvents() {
   document.querySelectorAll("[data-lang]").forEach((button) =>
     button.addEventListener("click", () => {
       setLang(button.dataset.lang);
+      viewHooks.forEach((hook) => hook.onLang?.());
       if (!app.overview) return;
       renderWorkshops();
       renderDefinitions();
@@ -267,7 +268,33 @@ async function loadAppSwitch() {
   link.hidden = false;
 }
 
+// ── 화면 전환 (#preflight · #gallery · #progress) ─────────────
+const VIEWS = ["preflight", "gallery", "progress"];
+/** gallery.js · progress.js 가 등록한다: { view, onShow(), onHide(), onLang() } */
+const viewHooks = [];
+
+function currentView() {
+  const view = location.hash.slice(1);
+  return VIEWS.includes(view) ? view : "preflight";
+}
+
+function showView() {
+  const view = currentView();
+  document.querySelectorAll("[data-view-panel]").forEach((panel) => { panel.hidden = panel.dataset.viewPanel !== view; });
+  document.querySelectorAll("[data-view]").forEach((button) => {
+    if (button.dataset.view === view) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  });
+  viewHooks.forEach((hook) => (hook.view === view ? hook.onShow?.() : hook.onHide?.()));
+}
+
+document.querySelectorAll("[data-view]").forEach((button) =>
+  button.addEventListener("click", () => { location.hash = button.dataset.view; }));
+window.addEventListener("hashchange", showView);
+
 applyStaticText();
 bindEvents();
 loadOverview().catch((error) => toast(error.message, true));
 loadAppSwitch();
+// 다른 스크립트(gallery.js, progress.js)가 viewHooks 에 등록한 뒤 첫 화면을 그린다
+window.addEventListener("DOMContentLoaded", showView);

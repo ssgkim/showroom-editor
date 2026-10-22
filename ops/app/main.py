@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException, Path as PathParam
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import preflight
+from . import gallery, preflight, progress
 from .definitions import editor_state, load_overrides, resolve, save_override
 from .kube import KubeError, oc, route_url
 from .schemas import DefinitionError, DefinitionIn, parse_definition
@@ -21,6 +21,7 @@ Name = Annotated[str, PathParam(pattern=NAME_PATTERN)]
 EDITOR_ROUTE = ("showroom-editor", "showroom-editor")
 
 _reports: dict[str, dict] = {}
+_progress: dict[str, dict] = {}
 _reports_lock = threading.Lock()
 
 
@@ -111,6 +112,37 @@ def create_app() -> FastAPI:
             media_type="text/markdown; charset=utf-8",
             headers={"Content-Disposition": f'attachment; filename="preflight-{wid}.md"'},
         )
+
+    @app.get("/api/gallery")
+    def get_gallery() -> dict:
+        try:
+            state = editor_state()
+            overrides = load_overrides()
+        except KubeError as exc:
+            raise _fail(exc) from exc
+        with _reports_lock:
+            reports = dict(_reports)
+        return {"cards": gallery.build(state, overrides, reports)}
+
+    @app.post("/api/progress/{wid}")
+    def run_progress(wid: Name) -> dict:
+        try:
+            result = progress.run(wid, _domain())
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=f"에디터에 없는 워크샵입니다: {wid}") from exc
+        except KubeError as exc:
+            raise _fail(exc) from exc
+        with _reports_lock:
+            _progress[wid] = result
+        return result
+
+    @app.get("/api/progress/{wid}")
+    def last_progress(wid: Name) -> dict:
+        with _reports_lock:
+            result = _progress.get(wid)
+        if result is None:
+            raise HTTPException(status_code=404, detail="아직 확인하지 않았습니다")
+        return result
 
     @app.get("/api/links")
     def links() -> dict:
