@@ -79,6 +79,15 @@ def test_pod_phase(init_statuses, ready, expected):
     assert phase == expected
 
 
+def test_pod_phase_reports_step_code_not_text():
+    building = _pod([{"name": "clone", "state": {"running": {}}}])
+    failed = _pod([{"name": "clone", "state": {"terminated": {"exitCode": 0}}},
+                   {"name": "build", "state": {"terminated": {"exitCode": 1}}}])
+
+    assert status._pod_phase(building) == ("building", "clone")
+    assert status._pod_phase(failed) == ("failed", "build")
+
+
 def test_pod_phase_without_pod_is_pending():
     assert status._pod_phase(None)[0] == "pending"
 

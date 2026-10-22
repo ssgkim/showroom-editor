@@ -1,7 +1,7 @@
 # RHOAI 워크샵 Showroom
 
 여러 워크샵 콘텐츠(Showroom/Antora 저장소)를 **하나의 Antora 사이트로 합쳐** 사용자마다 같은 Showroom을 배포한다.
-인스트럭터는 **Showroom Editor** 화면에서 콘텐츠를 고르고, 미리보고, 배포한다.
+인스트럭터는 **Showroom Editor** 화면에서 콘텐츠를 고르고, 미리보고, 배포한다. 화면은 한국어/영어로 전환할 수 있다(오른쪽 위).
 
 - 사용자별 주소: `https://showroom-showroom-<user>.<cluster domain>` (네임스페이스 `showroom-<user>`)
 - 시작 페이지: 포함된 워크샵 목록(home). 각 워크샵은 `/<콘텐츠 이름>/main/...` 경로에 들어간다.

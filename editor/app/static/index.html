@@ -15,83 +15,89 @@
       <span class="brand-mark" aria-hidden="true"></span>
       <div>
         <h1>Showroom Editor</h1>
-        <p class="brand-sub">워크샵 콘텐츠 구성 · 미리보기 · 배포</p>
+        <p class="brand-sub" data-i18n="brand.sub"></p>
       </div>
     </div>
-    <dl class="cluster">
-      <div><dt>클러스터</dt><dd id="cluster-domain">—</dd></div>
-      <div><dt>배포 중</dt><dd id="deployed-badge">없음</dd></div>
-    </dl>
+    <div class="topbar-right">
+      <dl class="cluster">
+        <div><dt data-i18n="cluster.label"></dt><dd id="cluster-domain">—</dd></div>
+        <div><dt data-i18n="deployed.label"></dt><dd id="deployed-badge"></dd></div>
+      </dl>
+      <div class="lang-switch" role="group" aria-label="Language">
+        <button type="button" data-lang="ko">한국어</button>
+        <button type="button" data-lang="en">English</button>
+      </div>
+    </div>
   </header>
 
   <main class="layout">
     <section class="panel panel-catalog" aria-labelledby="catalog-heading">
       <header class="panel-head">
         <p class="step">01</p>
-        <h2 id="catalog-heading">콘텐츠 카탈로그</h2>
-        <p class="panel-desc">Showroom(Antora) 형식 저장소를 등록합니다. 등록할 때 저장소를 검사합니다.</p>
+        <h2 id="catalog-heading" data-i18n="catalog.heading"></h2>
+        <p class="panel-desc" data-i18n="catalog.desc"></p>
       </header>
       <ul id="catalog-list" class="catalog-list"></ul>
       <form id="catalog-form" class="catalog-form" autocomplete="off">
-        <h3>새 콘텐츠 등록</h3>
-        <label>이름 <span class="hint">URL 경로가 됩니다 (소문자, 숫자, -)</span>
-          <input name="name" required pattern="[a-z0-9][a-z0-9\-]{0,40}" placeholder="예: agentops">
+        <h3 data-i18n="catalog.new"></h3>
+        <label><span data-i18n="form.name"></span> <span class="hint" data-i18n="form.nameHint"></span>
+          <input name="name" required pattern="[a-z0-9][a-z0-9\-]{0,40}" data-i18n-placeholder="ph.name">
         </label>
-        <label>git 주소
+        <label><span data-i18n="form.repoUrl"></span>
           <input name="repoUrl" required type="url" pattern="https://.+" placeholder="https://github.com/org/workshop.git">
         </label>
         <div class="row">
-          <label>브랜치/태그 <input name="repoRef" value="main" required></label>
-          <label>콘텐츠 경로 <input name="startPath" value="content" required></label>
+          <label><span data-i18n="form.ref"></span> <input name="repoRef" value="main" required></label>
+          <label><span data-i18n="form.startPath"></span> <input name="startPath" value="content" required></label>
         </div>
-        <label>제목 <span class="hint">비우면 antora.yml 의 title</span>
-          <input name="title" placeholder="예: Basic AgentOps on Red Hat AI">
+        <label><span data-i18n="form.title"></span> <span class="hint" data-i18n="form.titleHint"></span>
+          <input name="title" data-i18n-placeholder="ph.title">
         </label>
         <details>
-          <summary>탭 · 속성 (선택)</summary>
-          <label>추가 탭 <span class="hint">한 줄에 하나: 이름 | URL · <code>{{ .domain }}</code> 사용 가능</span>
+          <summary data-i18n="form.advanced"></summary>
+          <label><span data-i18n="form.tabs"></span> <span class="hint" data-i18n="form.tabsHint"></span>
             <textarea name="tabs" rows="2" placeholder="MLflow Console | https://mlflow-server.{{ .domain }}/"></textarea>
           </label>
-          <label>Antora 속성 <span class="hint">한 줄에 하나: 이름 = 값 · <code>{{ .user }}</code> 사용 가능</span>
+          <label><span data-i18n="form.attrs"></span> <span class="hint" data-i18n="form.attrsHint"></span>
             <textarea name="attributes" rows="3" placeholder="demo-ns = demo-{{ .user }}"></textarea>
           </label>
         </details>
-        <button type="submit" class="btn btn-ink">검사 후 등록</button>
+        <button type="submit" class="btn btn-ink" data-i18n="form.submit"></button>
       </form>
     </section>
 
     <section class="panel panel-composer" aria-labelledby="composer-heading">
       <header class="panel-head">
         <p class="step">02</p>
-        <h2 id="composer-heading">워크샵 구성</h2>
-        <p class="panel-desc">행사마다 포함할 콘텐츠와 순서를 정합니다. 사용자 Showroom 하나에 모두 합쳐집니다.</p>
+        <h2 id="composer-heading" data-i18n="composer.heading"></h2>
+        <p class="panel-desc" data-i18n="composer.desc"></p>
       </header>
       <div class="workshop-tabs" id="workshop-tabs" role="tablist"></div>
       <form id="workshop-form" class="workshop-form" autocomplete="off">
         <div class="row">
-          <label class="grow">워크샵 제목 <input name="title" required maxlength="100" placeholder="예: BC카드 RHOAI 핸즈온"></label>
-          <label>ID <input name="id" required pattern="[a-z0-9][a-z0-9\-]{0,40}" placeholder="예: bccard-2026-11"></label>
+          <label class="grow"><span data-i18n="ws.title"></span> <input name="title" required maxlength="100" data-i18n-placeholder="ph.wsTitle"></label>
+          <label><span data-i18n="ws.id"></span> <input name="id" required pattern="[a-z0-9][a-z0-9\-]{0,40}" data-i18n-placeholder="ph.wsId"></label>
         </div>
         <div class="row">
-          <label>시작 사용자 <input name="userStart" type="number" min="1" value="1" required></label>
-          <label>사용자 수 <input name="userCount" type="number" min="1" max="200" value="20" required></label>
+          <label><span data-i18n="ws.userStart"></span> <input name="userStart" type="number" min="1" value="1" required></label>
+          <label><span data-i18n="ws.userCount"></span> <input name="userCount" type="number" min="1" max="200" value="20" required></label>
           <p class="range" id="user-range"></p>
         </div>
         <div class="compose">
           <div>
-            <h3>포함된 콘텐츠 <span class="count" id="selected-count">0</span></h3>
+            <h3><span data-i18n="ws.selected"></span> <span class="count" id="selected-count">0</span></h3>
             <ol id="selected-list" class="selected-list"></ol>
           </div>
           <div>
-            <h3>추가할 수 있는 콘텐츠</h3>
+            <h3 data-i18n="ws.available"></h3>
             <ul id="available-list" class="available-list"></ul>
           </div>
         </div>
         <div class="actions">
-          <button type="submit" class="btn btn-ghost">저장</button>
-          <button type="button" class="btn btn-ink" id="btn-preview">저장 후 미리보기</button>
-          <button type="button" class="btn btn-red" id="btn-deploy" data-confirm="user 범위 전체에 배포할까요? 다시 클릭">저장 후 배포</button>
-          <button type="button" class="btn btn-text danger" id="btn-delete-workshop" data-confirm="정말 삭제? 다시 클릭">워크샵 삭제</button>
+          <button type="submit" class="btn btn-ghost" data-i18n="btn.save"></button>
+          <button type="button" class="btn btn-ink" id="btn-preview" data-i18n="btn.preview"></button>
+          <button type="button" class="btn btn-red" id="btn-deploy" data-i18n="btn.deploy" data-i18n-confirm="confirm.deploy"></button>
+          <button type="button" class="btn btn-text danger" id="btn-delete-workshop" data-i18n="btn.deleteWorkshop" data-i18n-confirm="confirm.deleteWorkshop"></button>
         </div>
       </form>
     </section>
@@ -99,32 +105,32 @@
     <section class="panel panel-runs" aria-labelledby="runs-heading">
       <header class="panel-head">
         <p class="step">03</p>
-        <h2 id="runs-heading">미리보기 · 배포 상태</h2>
+        <h2 id="runs-heading" data-i18n="runs.heading"></h2>
       </header>
       <article class="run-card" id="preview-card">
         <div class="run-head">
-          <h3>미리보기</h3>
-          <button type="button" class="btn btn-text danger" data-role-remove="preview" data-confirm="미리보기 삭제? 다시 클릭">삭제</button>
+          <h3 data-i18n="preview.heading"></h3>
+          <button type="button" class="btn btn-text danger" data-role-remove="preview" data-i18n="btn.delete" data-i18n-confirm="confirm.removePreview"></button>
         </div>
-        <p class="run-meta" id="preview-meta">아직 미리보기가 없습니다.</p>
+        <p class="run-meta" id="preview-meta"></p>
         <ul class="status-list" id="preview-status"></ul>
       </article>
       <article class="run-card run-card-deploy" id="deploy-card">
         <div class="run-head">
-          <h3>배포</h3>
+          <h3 data-i18n="deploy.heading"></h3>
           <div class="run-buttons">
-            <button type="button" class="btn btn-text" data-role-restart="deploy" data-confirm="전체 재시작? 다시 클릭">전체 재시작</button>
-            <button type="button" class="btn btn-text danger" data-role-remove="deploy" data-confirm="모든 사용자 Showroom 삭제? 다시 클릭">배포 해제</button>
+            <button type="button" class="btn btn-text" data-role-restart="deploy" data-i18n="btn.restartAll" data-i18n-confirm="confirm.restart"></button>
+            <button type="button" class="btn btn-text danger" data-role-remove="deploy" data-i18n="btn.undeploy" data-i18n-confirm="confirm.undeploy"></button>
           </div>
         </div>
-        <p class="run-meta" id="deploy-meta">배포된 워크샵이 없습니다.</p>
+        <p class="run-meta" id="deploy-meta"></p>
         <p class="tally" id="deploy-tally"></p>
         <ul class="status-list status-grid" id="deploy-status"></ul>
       </article>
       <article class="log-card" id="log-card" hidden>
         <div class="run-head">
-          <h3 id="log-title">빌드 로그</h3>
-          <button type="button" class="btn btn-text" id="btn-close-log">닫기</button>
+          <h3 id="log-title" data-i18n="log.title"></h3>
+          <button type="button" class="btn btn-text" id="btn-close-log" data-i18n="btn.close"></button>
         </div>
         <pre id="log-body"></pre>
       </article>
@@ -132,6 +138,7 @@
   </main>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/static/i18n.js" defer></script>
   <script src="/static/app.js" defer></script>
 </body>
 </html>

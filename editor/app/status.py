@@ -5,7 +5,8 @@ from .deployer import ROLE_LABEL
 from .kube import KubeError, oc, oc_json
 
 APP_LABEL = "app.kubernetes.io/name=showroom"
-STEP_LABELS = {"clone": "저장소 가져오는 중", "build": "Antora 빌드 중"}
+# 빌드 단계(init 컨테이너) 이름. 화면에서 언어별 문구로 바꾼다.
+BUILD_STEPS = ("clone", "build")
 LOG_TAIL = "80"
 
 
@@ -27,22 +28,23 @@ def _latest_pods(pods: list[dict]) -> dict[str, dict]:
 
 
 def _pod_phase(pod: dict | None) -> tuple[str, str]:
+    """(phase, step) 를 돌려준다. step 은 진행 중이거나 실패한 빌드 단계 이름이다."""
     if pod is None:
-        return "pending", "Pod 생성 대기"
+        return "pending", ""
     status = pod.get("status", {})
     for init in status.get("initContainerStatuses", []):
         state, last = init.get("state", {}), init.get("lastState", {})
-        step = STEP_LABELS.get(init["name"], init["name"])
         failed = state.get("terminated", {}).get("exitCode", 0) != 0 or (
             state.get("waiting", {}).get("reason") == "CrashLoopBackOff"
             or last.get("terminated", {}).get("exitCode", 0) != 0
         )
         if failed:
-            return "failed", f"{step} 실패"
+            return "failed", init["name"]
         if "running" in state or "waiting" in state:
-            return "building", step
-    ready = all(c.get("ready") for c in status.get("containerStatuses", [])) and status.get("containerStatuses")
-    return ("ready", "준비됨") if ready else ("starting", "서비스 시작 중")
+            return "building", init["name"]
+    containers = status.get("containerStatuses", [])
+    ready = bool(containers) and all(c.get("ready") for c in containers)
+    return ("ready", "") if ready else ("starting", "")
 
 
 def collect() -> dict:
@@ -57,15 +59,15 @@ def collect() -> dict:
         ns, role = meta["name"], meta["labels"].get(ROLE_LABEL)
         if role not in result:
             continue
-        phase, detail = _pod_phase(pods.get(ns))
+        phase, step = _pod_phase(pods.get(ns))
         if meta.get("deletionTimestamp"):
-            phase, detail = "terminating", "삭제 중"
+            phase, step = "terminating", ""
         host = hosts.get(ns)
         result[role].append({
             "namespace": ns,
             "user": meta["labels"].get("workshop-user", ns),
             "phase": phase,
-            "detail": detail,
+            "step": step,
             "url": f"https://{host}" if host else "",
         })
     for role in result:
@@ -81,7 +83,7 @@ def build_logs(namespace: str) -> dict:
     if pod is None:
         return {}
     logs = {}
-    for container in STEP_LABELS:
+    for container in BUILD_STEPS:
         try:
             logs[container] = oc(["logs", "-n", namespace, pod["metadata"]["name"], "-c", container, "--tail", LOG_TAIL])
         except KubeError as exc:

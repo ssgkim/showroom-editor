@@ -3,12 +3,7 @@
 const POLL_INTERVAL_MS = 4000;
 const CONFIRM_WINDOW_MS = 4000;
 const NEW_WORKSHOP = "__new";
-const PHASE_LABELS = {
-  ready: "준비됨", building: "빌드 중", starting: "시작 중",
-  pending: "대기", failed: "실패", terminating: "삭제 중",
-};
-
-const app = { data: null, selected: NEW_WORKSHOP, draft: emptyDraft() };
+const app = { data: null, status: null, selected: NEW_WORKSHOP, draft: emptyDraft() };
 
 function emptyDraft() {
   return { id: "", title: "", contents: [], userStart: 1, userCount: 20, isNew: true };
@@ -41,7 +36,7 @@ async function api(method, path, body) {
     const detail = Array.isArray(payload.detail)
       ? payload.detail.map((d) => d.msg).join(", ")
       : payload.detail;
-    throw new Error(detail || `요청 실패 (${response.status})`);
+    throw new Error(detail || t("err.request", { status: response.status }));
   }
   return payload;
 }
@@ -92,7 +87,7 @@ function confirmClick(button, task) {
 function parseLines(text, separator) {
   return text.split("\n").map((line) => line.trim()).filter(Boolean).map((line) => {
     const index = line.indexOf(separator);
-    if (index < 0) throw new Error(`형식이 맞지 않는 줄: ${line}`);
+    if (index < 0) throw new Error(t("err.badLine", { line }));
     return [line.slice(0, index).trim(), line.slice(index + separator.length).trim()];
   });
 }
@@ -123,7 +118,7 @@ function renderHeader() {
   $("cluster-domain").textContent = app.data.cluster?.domain || "—";
   const deployed = app.data.deploy;
   const badge = $("deployed-badge");
-  badge.textContent = deployed ? `${deployed.title} (${deployed.workshop})` : "없음";
+  badge.textContent = deployed ? `${deployed.title} (${deployed.workshop})` : t("deployed.none");
   badge.classList.toggle("live", Boolean(deployed));
 }
 
@@ -131,17 +126,17 @@ function renderCatalog() {
   const entries = Object.entries(app.data.catalog);
   const list = $("catalog-list");
   list.replaceChildren(...(entries.length ? entries.map(([name, item]) => {
-    const remove = h("button", { type: "button", class: "btn btn-text danger", "data-confirm": "삭제? 다시 클릭" }, "삭제");
+    const remove = h("button", { type: "button", class: "btn btn-text danger", "data-confirm": t("confirm.delete") }, t("btn.delete"));
     remove.addEventListener("click", () => confirmClick(remove, async () => {
       await api("DELETE", `/api/catalog/${name}`);
-      toast(`카탈로그에서 삭제: ${name}`);
+      toast(t("toast.catalogDeleted", { name }));
       await loadState();
     }));
     return h("li", { class: "catalog-item" },
       h("header", {}, h("span", { class: "name" }, name), remove),
       h("p", { class: "title" }, item.title),
       h("p", { class: "repo" }, `${item.repoUrl} @ ${item.repoRef} · ${item.commit}`));
-  }) : [h("li", {}, h("p", { class: "empty" }, "등록된 콘텐츠가 없습니다. 아래에서 git 주소를 등록하세요."))]));
+  }) : [h("li", {}, h("p", { class: "empty" }, t("catalog.empty")))]));
 }
 
 function renderWorkshopTabs() {
@@ -151,12 +146,12 @@ function renderWorkshopTabs() {
       type: "button", class: "workshop-tab", role: "tab",
       "aria-selected": String(app.selected === id),
       onclick: () => { selectWorkshop(id); renderAll(); },
-    }, w.title, id === deployedId ? h("span", { class: "live-dot", title: "배포 중" }) : null));
+    }, w.title, id === deployedId ? h("span", { class: "live-dot", title: t("composer.live") }) : null));
   tabs.push(h("button", {
     type: "button", class: "workshop-tab new", role: "tab",
     "aria-selected": String(app.selected === NEW_WORKSHOP),
     onclick: () => { selectWorkshop(NEW_WORKSHOP); renderAll(); },
-  }, "+ 새 워크샵"));
+  }, t("composer.new")));
   $("workshop-tabs").replaceChildren(...tabs);
 }
 
@@ -195,56 +190,59 @@ function renderContentLists() {
   $("selected-list").replaceChildren(...(contents.length ? contents.map((name, index) =>
     h("li", {},
       h("span", { class: "label" }, catalog[name]?.title || name, h("small", {}, name)),
-      h("button", { type: "button", class: "icon-btn", title: "위로", disabled: index === 0, onclick: () => moveContent(index, -1) }, "↑"),
-      h("button", { type: "button", class: "icon-btn", title: "아래로", disabled: index === contents.length - 1, onclick: () => moveContent(index, 1) }, "↓"),
+      h("button", { type: "button", class: "icon-btn", title: t("action.up"), disabled: index === 0, onclick: () => moveContent(index, -1) }, "↑"),
+      h("button", { type: "button", class: "icon-btn", title: t("action.down"), disabled: index === contents.length - 1, onclick: () => moveContent(index, 1) }, "↓"),
       h("button", {
-        type: "button", class: "icon-btn", title: "빼기",
+        type: "button", class: "icon-btn", title: t("action.remove"),
         onclick: () => { app.draft = { ...app.draft, contents: contents.filter((c) => c !== name) }; renderContentLists(); },
       }, "✕"))
-  ) : [h("li", { class: "empty-row" }, h("p", { class: "empty" }, "오른쪽에서 콘텐츠를 추가하세요."))]));
+  ) : [h("li", { class: "empty-row" }, h("p", { class: "empty" }, t("ws.selectedEmpty")))]));
 
   const available = Object.keys(catalog).filter((name) => !contents.includes(name));
   $("available-list").replaceChildren(...(available.length ? available.map((name) =>
     h("li", {},
       h("span", { class: "label" }, catalog[name].title, h("small", {}, name)),
       h("button", {
-        type: "button", class: "icon-btn", title: "추가",
+        type: "button", class: "icon-btn", title: t("action.add"),
         onclick: () => { app.draft = { ...app.draft, contents: [...contents, name] }; renderContentLists(); },
       }, "+"))
-  ) : [h("li", { class: "empty-row" }, h("p", { class: "empty" }, "추가할 콘텐츠가 없습니다."))]));
+  ) : [h("li", { class: "empty-row" }, h("p", { class: "empty" }, t("ws.availableEmpty")))]));
 }
 
 function renderRunMeta() {
   const describe = (record) => record
-    ? `${record.title} · ${record.contents.join(", ")} · ${new Date(record.at).toLocaleString("ko-KR")}`
+    ? `${record.title} · ${record.contents.join(", ")} · ${new Date(record.at).toLocaleString(i18n.lang === "ko" ? "ko-KR" : "en-US")}`
     : null;
-  $("preview-meta").textContent = describe(app.data.preview) || "아직 미리보기가 없습니다.";
-  $("deploy-meta").textContent = describe(app.data.deploy) || "배포된 워크샵이 없습니다.";
+  $("preview-meta").textContent = describe(app.data.preview) || t("preview.none");
+  $("deploy-meta").textContent = describe(app.data.deploy) || t("deploy.none");
 }
 
 function statusItem(item) {
   const label = item.url ? h("a", { href: item.url, target: "_blank", rel: "noopener" }, item.user) : h("span", {}, item.user);
+  const failed = item.phase === "failed";
   const chip = h("button", {
-    type: "button", class: "chip", "data-phase": item.phase, title: item.detail,
-    onclick: item.phase === "failed" ? () => showLogs(item.namespace) : undefined,
-  }, item.phase === "building" ? item.detail : PHASE_LABELS[item.phase] || item.phase);
+    type: "button", class: "chip", "data-phase": item.phase,
+    title: failed && item.step ? t(`stepFailed.${item.step}`) : undefined,
+    onclick: failed ? () => showLogs(item.namespace) : undefined,
+  }, item.phase === "building" && item.step ? t(`step.${item.step}`) : t(`phase.${item.phase}`));
   return h("li", { class: "status-item" }, label, chip);
 }
 
 function renderStatus(status) {
+  app.status = status;
   $("preview-status").replaceChildren(...status.preview.map(statusItem));
   $("deploy-status").replaceChildren(...status.deploy.map(statusItem));
   const ready = status.deploy.filter((s) => s.phase === "ready").length;
   const failed = status.deploy.filter((s) => s.phase === "failed").length;
   $("deploy-tally").textContent = status.deploy.length
-    ? `준비됨 ${ready} / ${status.deploy.length}${failed ? ` · 실패 ${failed} (눌러서 로그 보기)` : ""}`
+    ? t("tally", { ready, total: status.deploy.length }) + (failed ? t("tally.failed", { failed }) : "")
     : "";
 }
 
 async function showLogs(namespace) {
   try {
     const logs = await api("GET", `/api/logs/${namespace}`);
-    $("log-title").textContent = `빌드 로그 · ${namespace}`;
+    $("log-title").textContent = t("log.titleFor", { ns: namespace });
     $("log-body").textContent = Object.entries(logs).map(([step, text]) => `── ${step} ──\n${text}`).join("\n\n");
     $("log-card").hidden = false;
     $("log-card").scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -257,7 +255,7 @@ async function pollStatus() {
   try {
     renderStatus(await api("GET", "/api/status"));
   } catch (error) {
-    console.warn("상태 조회 실패", error);
+    console.warn("status polling failed", error);
   } finally {
     setTimeout(pollStatus, POLL_INTERVAL_MS);
   }
@@ -266,8 +264,8 @@ async function pollStatus() {
 // ── 동작 ──────────────────────────────────────────
 async function saveDraft() {
   const form = $("workshop-form");
-  if (!form.reportValidity()) throw new Error("입력값을 확인하세요");
-  if (!app.draft.contents.length) throw new Error("콘텐츠를 하나 이상 포함하세요");
+  if (!form.reportValidity()) throw new Error(t("err.invalid"));
+  if (!app.draft.contents.length) throw new Error(t("err.needContent"));
   const { id, title, contents, userStart, userCount } = app.draft;
   await api("PUT", `/api/workshops/${id}`, { title, contents, userStart: Number(userStart), userCount: Number(userCount) });
   app.selected = id;
@@ -286,38 +284,45 @@ function bindEvents() {
   });
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    busy(form.querySelector("[type=submit]"), async () => { await saveDraft(); toast("저장했습니다"); });
+    busy(form.querySelector("[type=submit]"), async () => { await saveDraft(); toast(t("toast.saved")); });
   });
   $("btn-preview").addEventListener("click", (event) => busy(event.currentTarget, async () => {
     const id = await saveDraft();
     await api("POST", `/api/workshops/${id}/preview`);
-    toast("미리보기를 빌드합니다. 1~2분 걸립니다");
+    toast(t("toast.previewStarted"));
     await loadState();
   }));
   $("btn-deploy").addEventListener("click", (event) => confirmClick(event.currentTarget, async () => {
     const id = await saveDraft();
     const result = await api("POST", `/api/workshops/${id}/deploy`);
-    toast(`${result.namespaces.length}명에게 배포를 시작했습니다${result.removed.length ? ` · ${result.removed.length}개 정리` : ""}`);
+    toast(t("toast.deployed", { count: result.namespaces.length })
+      + (result.removed.length ? t("toast.cleaned", { count: result.removed.length }) : ""));
     await loadState();
   }));
   $("btn-delete-workshop").addEventListener("click", (event) => confirmClick(event.currentTarget, async () => {
     await api("DELETE", `/api/workshops/${app.draft.id}`);
-    toast("워크샵을 삭제했습니다");
+    toast(t("toast.workshopDeleted"));
     selectWorkshop(NEW_WORKSHOP);
     await loadState();
   }));
   document.querySelectorAll("[data-role-remove]").forEach((button) =>
     button.addEventListener("click", () => confirmClick(button, async () => {
       const result = await api("DELETE", `/api/roles/${button.dataset.roleRemove}`);
-      toast(`${result.removed.length}개 네임스페이스를 삭제합니다`);
+      toast(t("toast.removed", { count: result.removed.length }));
       await loadState();
     })));
   document.querySelectorAll("[data-role-restart]").forEach((button) =>
     button.addEventListener("click", () => confirmClick(button, async () => {
       const result = await api("POST", `/api/roles/${button.dataset.roleRestart}/restart`);
-      toast(`${result.restarted.length}개 Showroom을 다시 빌드합니다`);
+      toast(t("toast.restarted", { count: result.restarted.length }));
     })));
   $("btn-close-log").addEventListener("click", () => { $("log-card").hidden = true; });
+  document.querySelectorAll("[data-lang]").forEach((button) =>
+    button.addEventListener("click", () => {
+      setLang(button.dataset.lang);
+      if (app.data) renderAll();
+      if (app.status) renderStatus(app.status);
+    }));
 
   const catalogForm = $("catalog-form");
   catalogForm.addEventListener("submit", (event) => {
@@ -333,15 +338,16 @@ function bindEvents() {
         tabs: parseLines(f.tabs.value, "|").map(([name, url]) => ({ name, url, external: true })),
         attributes: Object.fromEntries(parseLines(f.attributes.value, "=")),
       };
-      toast("저장소를 검사하는 중입니다…");
+      toast(t("toast.checking"));
       const result = await api("POST", "/api/catalog", body);
-      toast(`등록했습니다: ${result.title} (${result.commit})`);
+      toast(t("toast.registered", { title: result.title, commit: result.commit }));
       catalogForm.reset();
       await loadState();
     });
   });
 }
 
+applyStaticText();
 bindEvents();
 loadState().catch((error) => toast(error.message, true));
 pollStatus();

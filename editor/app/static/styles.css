@@ -77,7 +77,17 @@ code, pre, .mono { font-family: var(--font-mono); }
 }
 .brand h1 { margin: 0; font: 900 1.35rem/1 var(--font-display); letter-spacing: -0.01em; }
 .brand-sub { margin: 0.2rem 0 0; font-size: var(--text-sm); color: #b8b4ac; }
+.topbar-right { display: flex; align-items: center; gap: 1.75rem; }
 .cluster { display: flex; gap: 1.75rem; margin: 0; }
+.lang-switch { display: inline-flex; border: 1px solid #4a4a4a; border-radius: 999px; padding: 2px; }
+.lang-switch button {
+  font: 500 0.75rem var(--font-text); color: #b8b4ac; background: none; border: none;
+  padding: 0.3rem 0.75rem; border-radius: 999px; cursor: pointer;
+  transition: background var(--duration-fast), color var(--duration-fast);
+}
+.lang-switch button:hover { color: #f2efe8; }
+.lang-switch button[aria-pressed="true"] { background: #f2efe8; color: #151515; }
+.lang-switch button:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .cluster dt { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: #9a968e; }
 .cluster dd { margin: 0; font: 500 var(--text-sm) var(--font-mono); }
 #deployed-badge.live { color: #ff8a80; }
