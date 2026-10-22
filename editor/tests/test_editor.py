@@ -279,6 +279,7 @@ def test_page_api_lists_saves_and_flags_stale_source(tmp_path, monkeypatch):
     source.mkdir()
     _git_repo(source, {"content/antora.yml": "name: x\n", "content/modules/ROOT/pages/index.adoc": "= 원본\n"})
     monkeypatch.setattr(repofiles, "CACHE_DIR", tmp_path / "cache")
+    monkeypatch.setattr(repofiles, "REMOTE_CHECK_TTL", -1)
     state = {**STATE, "catalog": {"agentops": {**STATE["catalog"]["agentops"], "repoUrl": str(source), "repoRef": "main"}},
              "workshops": {"ws": {**WORKSHOP, "contents": ["agentops"]}}}
     saved = {}

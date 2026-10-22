@@ -4,14 +4,18 @@ import os
 import shutil
 import tempfile
 import threading
+import time
 from pathlib import Path, PurePosixPath
 
 from .gitcheck import RepoError, _git
 
 CACHE_DIR = Path(os.environ.get("REPO_CACHE_DIR", Path(tempfile.gettempdir()) / "showroom-editor-repos"))
 PAGE_SUFFIX = ".adoc"
+# 페이지를 연달아 열 때마다 원격을 조회하지 않도록, 이 시간 동안은 확인한 커밋을 그대로 쓴다
+REMOTE_CHECK_TTL = 30
 
 _lock = threading.Lock()
+_checked: dict[str, tuple[float, str]] = {}
 
 
 def blob_sha(data: bytes) -> str:
@@ -26,12 +30,21 @@ def _remote_commit(url: str, ref: str) -> str:
     return out.split()[0]
 
 
+def _current_commit(key: str, url: str, ref: str) -> str:
+    checked_at, commit = _checked.get(key, (0.0, ""))
+    if time.monotonic() - checked_at <= REMOTE_CHECK_TTL:
+        return commit
+    commit = _remote_commit(url, ref)
+    _checked[key] = (time.monotonic(), commit)
+    return commit
+
+
 def checkout(url: str, ref: str) -> tuple[Path, str]:
     """(작업 디렉터리, 커밋) 을 돌려준다. 같은 커밋이면 캐시를 그대로 쓴다."""
     key = hashlib.sha256(f"{url}@{ref}".encode()).hexdigest()[:16]
     target = CACHE_DIR / key
     with _lock:
-        commit = _remote_commit(url, ref)
+        commit = _current_commit(key, url, ref)
         if (target / ".git").is_dir() and _git(["rev-parse", "HEAD"], cwd=str(target)) == commit:
             return target, commit
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -40,7 +53,9 @@ def checkout(url: str, ref: str) -> tuple[Path, str]:
         shutil.rmtree(target, ignore_errors=True)
         (fresh / "repo").rename(target)
         shutil.rmtree(fresh, ignore_errors=True)
-        return target, _git(["rev-parse", "HEAD"], cwd=str(target))
+        commit = _git(["rev-parse", "HEAD"], cwd=str(target))
+        _checked[key] = (time.monotonic(), commit)
+        return target, commit
 
 
 def check_page_path(path: str, start_path: str) -> str:

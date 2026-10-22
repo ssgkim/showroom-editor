@@ -150,6 +150,21 @@ llm_api_key = <MaaS API 키>
 
 - 워크샵 삭제: **워크샵 삭제**. 현재 배포 중인 워크샵은 삭제할 수 없습니다. 먼저 배포를 해제하세요.
 
+### 행사별 페이지 수정
+
+원본 저장소를 고치지 않고 **이 워크샵에서만** 페이지 내용을 바꿉니다. 예: 행사 일정 안내 추가, 사내 환경에 맞춘 문구·주의 사항 수정.
+참가자 로그인과 행사 공지는 RHDP 워크샵 페이지(`catalog.demo.redhat.com/workshop/...`)가 제공하므로 여기서는 콘텐츠 본문만 다룹니다.
+
+1. 워크샵을 **저장**한 뒤, 포함된 콘텐츠 줄의 **✎** 를 누릅니다. (수정한 파일 수가 빨간 숫자로 표시됩니다.)
+2. 왼쪽 목록에서 페이지(`.adoc`)를 골라 고칩니다. **원본과 나란히 보기**로 원본과 비교할 수 있습니다.
+3. **저장**합니다. 이 단계에서는 Showroom 이 바뀌지 않습니다.
+4. **저장 후 미리보기**로 확인하고, **저장 후 배포**(이미 배포 중이면 **전체 재시작**)로 반영합니다.
+
+- 목록 표시: `●` 수정함, `⚠` 수정한 뒤 원본 저장소의 같은 파일이 바뀜 → 원본과 비교해 다시 저장하거나 되돌리세요. 수정한 파일이 그대로 원본을 덮어쓰므로 원본의 새 내용은 반영되지 않습니다.
+- **원본으로 되돌리기**: 수정을 지웁니다(두 번 눌러 확정).
+- 수정할 수 있는 파일: 콘텐츠 경로 아래의 기존 `.adoc` 파일(페이지, `nav.adoc`, partials). 새 파일 추가와 이미지 교체는 지원하지 않습니다.
+- 수정 내용은 ConfigMap `showroom-editor-overlays` 에 저장되며 전체 900KB 까지입니다. 워크샵을 삭제하면 함께 지워집니다.
+
 ---
 
 ## 6. 미리보기
@@ -246,6 +261,15 @@ oc get configmap showroom-editor-state -n showroom-editor \
 # 복원 (다른 클러스터로 옮길 때도 동일, 에디터 재시작 불필요)
 oc create configmap showroom-editor-state -n showroom-editor \
   --from-file=state.json=showroom-editor-backup.json --dry-run=client -o yaml | oc apply -f -
+```
+
+행사별 페이지 수정은 ConfigMap `showroom-editor-overlays` 에 따로 저장됩니다.
+
+```bash
+oc get configmap showroom-editor-overlays -n showroom-editor \
+  -o jsonpath='{.data.overlays\.json}' > showroom-editor-overlays.json
+oc create configmap showroom-editor-overlays -n showroom-editor \
+  --from-file=overlays.json=showroom-editor-overlays.json --dry-run=client -o yaml | oc apply -f -
 ```
 
 > 백업 파일의 미리보기·배포 기록은 원래 클러스터 기준입니다. 다른 클러스터에서는 워크샵을 다시 미리보기·배포하세요.
