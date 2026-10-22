@@ -80,6 +80,8 @@ spec:
     git:
       uri: https://github.com/ssgkim/showroom-editor.git
       ref: main
+    # 이전 버전(Binary 빌드)에서 업데이트할 때 남은 binary 설정을 지운다
+    binary: null
   strategy:
     type: Docker
     dockerStrategy:
