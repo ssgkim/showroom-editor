@@ -294,9 +294,9 @@ oc create configmap showroom-editor-overlays -n showroom-editor \
 
 ---
 
-## 13. Workshop Ops Hub: 사전 점검
+## 13. Workshop Ops Hub: 사전 점검 · 갤러리 · 진행 현황
 
-행사 전에 **이 클러스터에서 워크샵을 진행할 수 있는지** 자동으로 확인하는 별도 사이트입니다.
+행사 전에 **이 클러스터에서 워크샵을 진행할 수 있는지** 확인하고(사전 점검), 콘텐츠를 한눈에 보고(갤러리), 행사 중 **사용자별 실습 진행 상황**을 보는(진행 현황) 별도 사이트입니다. 상단 탭으로 전환합니다.
 Showroom Editor 에 저장된 워크샵을 그대로 읽고, 클러스터는 **읽기만** 합니다.
 
 ### 설치
@@ -334,12 +334,33 @@ curl -sL https://raw.githubusercontent.com/ssgkim/showroom-editor/main/ops/deplo
 
 > 점검 결과는 Ops Hub 가 재시작되면 사라집니다(다시 점검). 덮어쓴 정의는 `workshop-ops` 네임스페이스의 ConfigMap `workshop-ops-overrides` 에 저장되어 유지됩니다.
 
+### 갤러리
+
+Showroom Editor 카탈로그의 콘텐츠를 카드로 보여 줍니다.
+
+- 카드 내용: 소개·소요 시간·난이도·대상(정의의 `about`), 요구 사항 수(필수/권장), 체크포인트 수와 모듈, 이 콘텐츠를 포함한 워크샵(● 배포 중), 저장소와 커밋.
+- 오른쪽 위 배지: 이 콘텐츠를 포함한 **가장 최근 사전 점검**에서 콘텐츠 항목만 본 판정(준비됨 / 확인 필요 / 준비 안 됨 / 점검 전). 공통 점검 결과는 넣지 않습니다.
+- **요구 사항 · 체크포인트 보기**로 항목을 펼칩니다. **배포 중 워크샵** 필터로 지금 행사에 쓰는 콘텐츠만 봅니다.
+
+### 진행 현황
+
+배포한 사용자마다 정의의 `checkpoints`(실습 결과물)가 클러스터에 있는지 확인해 **사용자 × 체크포인트** 표로 보여 줍니다.
+
+1. **워크샵**을 고르고(배포 중인 워크샵이 기본) **지금 확인**을 누릅니다. 20명 기준 몇 초 걸립니다.
+2. 행사 중에는 **1분마다 자동 확인**을 켜 둡니다(진행 현황 탭을 보고 있을 때만 동작).
+
+- 위쪽: 사용자 수, Showroom 준비 수, 전체 진행률, 체크포인트별 완료 막대.
+- 표: `✓` 완료, `·` 아직, `?` 확인 실패. 칸에 마우스를 올리면 관찰 값이 보입니다. 사용자 이름 앞 점은 Showroom 상태(초록 준비 · 주황 시작 중 · 빨강 없음)이고, 누르면 그 사용자의 Showroom 이 열립니다.
+- 모든 사용자에서 확인 실패한 체크포인트는 표 위에 원인을 표시합니다(예: 해당 CRD 가 없음).
+- 체크포인트가 없는 콘텐츠는 열이 생기지 않습니다. 아래 형식으로 정의에 추가하세요.
+- 확인 결과는 메모리에만 있어 Ops Hub 가 재시작되면 다시 확인해야 합니다.
+
 ### 워크샵 정의 (`workshop.yaml`) 작성법
 
 콘텐츠 저장소 **루트**에 두거나 Ops Hub 편집기에 입력합니다.
 
 ```yaml
-about:                        # 2차(갤러리)에서 사용
+about:                        # 갤러리에 표시
   summary: AI 앱을 배포하고 로그·트레이스·GPU 지표로 관찰합니다.
   audience: ML 엔지니어
   duration: 90m
@@ -352,7 +373,13 @@ requirements:                # 사전 점검 항목
     check: { type: gpuNodes, min: 1 }
     severity: recommended     # 실패해도 경고(⚠️). 기본은 required(❌)
     fix: "GPU 워커 노드를 추가하세요"
-checkpoints: []              # 3차(진행 현황)에서 사용
+checkpoints:                 # 진행 현황의 열 (사용자마다 확인)
+  - module: 2
+    name: 프로젝트 생성
+    check: { type: resource, kind: Namespace, name: "user-{{ .userNumber2 }}" }
+  - module: 2
+    name: 백엔드 배포
+    check: { type: resource, kind: Deployment, namespace: "demo-{{ .user }}", name: planner-backend, ready: true }
 ```
 
 | check.type | 필드 | 확인 내용 |
@@ -364,7 +391,8 @@ checkpoints: []              # 3차(진행 현황)에서 사용
 | `http` | `url`, `expect`(기본 200·301·302·401·403) | 엔드포인트 응답 코드 (인증서 검증 안 함) |
 | `capacity` | `users`, `cpuPerUser`, `memoryPerUser` | 워커 노드 여유 자원 |
 
-- 값에 `{{ .domain }}` 을 쓸 수 있습니다(`checkpoints` 에서는 `{{ .user }}` 도).
+- 값에 쓸 수 있는 자리표시자: `{{ .domain }}`, 그리고 `checkpoints` 에서 사용자별 값 `{{ .user }}`(user3), `{{ .userNumber }}`(3), `{{ .userNumber2 }}`(03, `user-03` 같은 이름용).
+- 체크포인트는 `resource` 유형을 권장합니다. 사용자마다 이름·네임스페이스만 다른 경우 클러스터 전체를 한 번만 조회해 빠르게 확인합니다.
 - 정해진 점검 유형만 실행되며 임의 명령은 실행할 수 없습니다.
 - YAML 값에 `: ` (콜론+공백)이 들어가면 따옴표로 감싸세요.
 - API 서버 주소는 루트(`/`)가 404 인 경우가 많습니다. 상태 확인 경로를 쓰세요(예: MaaS `https://maas.{{ .domain }}/maas-api/health`, `expect: [200]`).
