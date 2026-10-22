@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import deployer, gitcheck, status, store
-from .kube import KubeError
+from .kube import KubeError, route_url
 from .schemas import NAME_PATTERN, CatalogIn, WorkshopIn
 
 logger = logging.getLogger("showroom-editor")
@@ -18,6 +18,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 Name = Annotated[str, PathParam(pattern=NAME_PATTERN)]
 Role = Annotated[str, PathParam(pattern="^(preview|deploy)$")]
 ManagedNamespace = Annotated[str, PathParam(pattern=r"^showroom-[a-z0-9-]+$")]
+OPS_HUB_ROUTE = ("workshop-ops", "workshop-ops")
 
 
 def _now() -> str:
@@ -149,6 +150,10 @@ def create_app() -> FastAPI:
             raise _fail(exc, 403) from exc
         except KubeError as exc:
             raise _fail(exc) from exc
+
+    @app.get("/api/links")
+    def links() -> dict:
+        return {"opsHub": route_url(*OPS_HUB_ROUTE)}
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 

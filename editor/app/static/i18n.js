@@ -3,6 +3,7 @@
 /** 화면 문구. 키는 index.html 의 data-i18n* 속성과 app.js 의 t() 호출에서 쓴다. */
 const MESSAGES = {
   ko: {
+    "switch.kicker": "사전 점검",
     "brand.sub": "워크샵 콘텐츠 구성 · 미리보기 · 배포",
     "cluster.label": "클러스터",
     "deployed.label": "배포 중",
@@ -99,6 +100,7 @@ const MESSAGES = {
     "err.request": "요청 실패 ({status})",
   },
   en: {
+    "switch.kicker": "Pre-flight",
     "brand.sub": "Compose · preview · deploy workshop content",
     "cluster.label": "Cluster",
     "deployed.label": "Deployed",

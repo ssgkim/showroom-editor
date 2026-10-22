@@ -11,13 +11,14 @@ from fastapi.staticfiles import StaticFiles
 
 from . import preflight
 from .definitions import editor_state, load_overrides, resolve, save_override
-from .kube import KubeError, oc
+from .kube import KubeError, oc, route_url
 from .schemas import DefinitionError, DefinitionIn, parse_definition
 
 logger = logging.getLogger("workshop-ops")
 STATIC_DIR = Path(__file__).parent / "static"
 NAME_PATTERN = r"^[a-z0-9][a-z0-9-]{0,40}$"
 Name = Annotated[str, PathParam(pattern=NAME_PATTERN)]
+EDITOR_ROUTE = ("showroom-editor", "showroom-editor")
 
 _reports: dict[str, dict] = {}
 _reports_lock = threading.Lock()
@@ -110,6 +111,10 @@ def create_app() -> FastAPI:
             media_type="text/markdown; charset=utf-8",
             headers={"Content-Disposition": f'attachment; filename="preflight-{wid}.md"'},
         )
+
+    @app.get("/api/links")
+    def links() -> dict:
+        return {"editor": route_url(*EDITOR_ROUTE)}
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 

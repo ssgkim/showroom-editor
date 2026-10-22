@@ -258,6 +258,16 @@ function bindEvents() {
     }));
 }
 
+// ── 다른 앱으로 전환 (설치되어 있을 때만 링크를 보인다) ─────────────
+async function loadAppSwitch() {
+  const links = await api("GET", "/api/links").catch(() => ({}));
+  if (!links.editor) return;
+  const link = $("app-switch");
+  link.href = links.editor;
+  link.hidden = false;
+}
+
 applyStaticText();
 bindEvents();
 loadOverview().catch((error) => toast(error.message, true));
+loadAppSwitch();

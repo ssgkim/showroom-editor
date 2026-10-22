@@ -158,3 +158,17 @@ def test_operator_query_skips_olm_copied_csvs(monkeypatch):
     checks.check_operator({"package": "web-terminal"}, _ctx())
 
     assert "!olm.copiedFrom" in calls[0]
+
+
+def test_links_point_to_editor_route(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from app import kube, main
+
+    calls = []
+    monkeypatch.setattr(kube, "oc", lambda args, **_: calls.append(args) or "editor.apps.example.com")
+
+    response = TestClient(main.create_app()).get("/api/links")
+
+    assert response.json() == {"editor": "https://editor.apps.example.com"}
+    assert calls[0][:5] == ["get", "route", "showroom-editor", "-n", "showroom-editor"]

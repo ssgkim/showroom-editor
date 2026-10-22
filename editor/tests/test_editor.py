@@ -151,3 +151,27 @@ def test_routes_receive_path_parameters(monkeypatch):
     assert "bccard-2026-11" in saved["workshops"]
     assert client.put("/api/workshops/Bad_Id", json=WORKSHOP).status_code == 422
     assert client.delete("/api/roles/other").status_code == 422
+
+
+def test_route_url_returns_none_when_other_app_is_missing(monkeypatch):
+    from app import kube
+
+    def missing(*_args, **_kwargs):
+        raise kube.KubeError('routes.route.openshift.io "workshop-ops" not found')
+    monkeypatch.setattr(kube, "oc", missing)
+
+    assert kube.route_url("workshop-ops", "workshop-ops") is None
+
+
+def test_links_point_to_ops_hub_route(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from app import kube, main
+
+    calls = []
+    monkeypatch.setattr(kube, "oc", lambda args, **_: calls.append(args) or "ops.apps.example.com")
+
+    response = TestClient(main.create_app()).get("/api/links")
+
+    assert response.json() == {"opsHub": "https://ops.apps.example.com"}
+    assert calls[0][:5] == ["get", "route", "workshop-ops", "-n", "workshop-ops"]

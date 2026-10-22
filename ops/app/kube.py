@@ -33,3 +33,12 @@ def oc_json(args: list[str], allow_missing: bool = False) -> dict | None:
             return None
         raise
     return json.loads(out)
+
+
+def route_url(namespace: str, name: str) -> str | None:
+    """Route 의 https 주소. 없거나 읽을 수 없으면 None (다른 앱이 설치되지 않은 경우)."""
+    try:
+        host = oc(["get", "route", name, "-n", namespace, "-o", "jsonpath={.spec.host}"], timeout=10).strip()
+    except KubeError:
+        return None
+    return f"https://{host}" if host else None

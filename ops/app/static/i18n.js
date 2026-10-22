@@ -32,6 +32,7 @@ checkpoints: []
 
 const MESSAGES = {
   ko: {
+    "switch.kicker": "콘텐츠 구성·배포",
     "brand.sub": "워크샵 운영 허브 · 사전 점검 · 갤러리 · 진행 현황",
     "cluster.label": "클러스터",
     "nav.preflight": "사전 점검",
@@ -84,6 +85,7 @@ const MESSAGES = {
     "err.request": "요청 실패 ({status})",
   },
   en: {
+    "switch.kicker": "Compose & deploy",
     "brand.sub": "Workshop operations hub · pre-flight · gallery · progress",
     "cluster.label": "Cluster",
     "nav.preflight": "Pre-flight",

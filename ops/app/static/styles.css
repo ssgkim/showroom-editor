@@ -335,3 +335,14 @@ details summary { cursor: pointer; font-size: var(--text-sm); font-weight: 500; 
 .placeholder-card { padding: 2rem; text-align: center; color: var(--color-muted); border: 1px dashed var(--color-line); border-radius: var(--radius-md); }
 /* display 를 지정한 요소도 hidden 속성이면 숨긴다 */
 [hidden] { display: none !important; }
+
+/* ── 앱 전환 링크 (Showroom Editor ⇄ Ops Hub) ─────────────────────────────── */
+.app-switch {
+  display: inline-flex; flex-direction: column; gap: 0.1rem;
+  padding: 0.35rem 0.85rem; border: 1px solid #4a4a4a; border-radius: 6px;
+  color: #f2efe8; text-decoration: none; font: 600 var(--text-sm) var(--font-text);
+  transition: border-color var(--duration-fast), background var(--duration-fast);
+}
+.app-switch small { font: 500 0.68rem var(--font-text); letter-spacing: 0.08em; text-transform: uppercase; color: #9a968e; }
+.app-switch:hover { border-color: var(--color-red); background: #222; }
+.app-switch:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
