@@ -94,6 +94,41 @@
             <ul id="available-list" class="available-list"></ul>
           </div>
         </div>
+        <details class="home-editor" id="home-editor">
+          <summary><span data-i18n="home.legend"></span> <span class="home-summary" id="home-summary"></span></summary>
+          <p class="hint" data-i18n="home.hint"></p>
+          <div class="home-grid">
+            <div class="home-fields">
+              <label><span data-i18n="home.title"></span> <span class="hint" data-i18n="home.titleHint"></span>
+                <input name="homeTitle" maxlength="120">
+              </label>
+              <label><span data-i18n="home.label"></span>
+                <input name="homeLabel" maxlength="60" data-i18n-placeholder="home.defaultLabel">
+              </label>
+              <fieldset class="content-labels">
+                <legend><span data-i18n="home.contentLabels"></span> <span class="hint" data-i18n="home.contentLabelsHint"></span></legend>
+                <div id="content-labels"></div>
+              </fieldset>
+              <label><span data-i18n="home.links"></span> <span class="hint" data-i18n="home.linksHint"></span>
+                <textarea name="navLinks" rows="2" placeholder="설문 | https://forms.example.com/abc"></textarea>
+              </label>
+              <div class="home-page-row">
+                <div>
+                  <p class="home-page-label"><span data-i18n="home.page"></span> <span class="home-page-state" id="home-page-state"></span></p>
+                  <p class="hint" data-i18n="home.pageHint"></p>
+                </div>
+                <button type="button" class="btn btn-ghost" id="btn-home-page" data-i18n="home.pageEdit"></button>
+              </div>
+            </div>
+            <figure class="home-preview" aria-live="polite">
+              <figcaption data-i18n="home.preview"></figcaption>
+              <div class="nav-mock">
+                <p class="nav-mock-title" id="nav-preview-title"></p>
+                <ul class="nav-mock-list" id="nav-preview-list"></ul>
+              </div>
+            </figure>
+          </div>
+        </details>
         <div class="actions">
           <button type="submit" class="btn btn-ghost" data-i18n="btn.save"></button>
           <button type="button" class="btn btn-ink" id="btn-preview" data-i18n="btn.preview"></button>
@@ -142,7 +177,7 @@
     <header class="page-head">
       <div>
         <h2 id="page-dialog-title"></h2>
-        <p class="page-sub"><span data-i18n="pages.desc"></span> <code id="page-commit"></code></p>
+        <p class="page-sub"><span id="page-dialog-desc"></span> <code id="page-commit"></code></p>
       </div>
       <button type="button" class="btn btn-text" id="btn-page-close" data-i18n="btn.close"></button>
     </header>
@@ -153,12 +188,15 @@
         <div class="page-bar">
           <code id="page-path"></code>
           <span class="page-state" id="page-state"></span>
-          <label class="page-toggle"><input type="checkbox" id="page-compare"> <span data-i18n="pages.compare"></span></label>
+          <label class="page-toggle"><input type="checkbox" id="page-compare"> <span id="page-compare-label" data-i18n="pages.compare"></span></label>
+          <label class="page-toggle"><input type="checkbox" id="page-render"> <span data-i18n="pages.render"></span></label>
         </div>
         <p class="page-stale" id="page-stale" data-i18n="pages.stale" hidden></p>
+        <p class="page-note" id="page-note" data-i18n="home.dialogNote" hidden></p>
         <div class="page-panes">
           <textarea id="page-text" spellcheck="false" aria-label="AsciiDoc"></textarea>
           <pre class="page-original" id="page-original" aria-label="Original"></pre>
+          <iframe class="page-render" id="page-render-frame" title="Rendered preview" sandbox=""></iframe>
         </div>
         <div class="page-actions">
           <p class="hint" data-i18n="pages.hint"></p>
@@ -173,5 +211,6 @@
   <script src="/static/i18n.js" defer></script>
   <script src="/static/app.js" defer></script>
   <script src="/static/pages.js" defer></script>
+  <script src="/static/home.js" defer></script>
 </body>
 </html>

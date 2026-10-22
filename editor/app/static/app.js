@@ -6,7 +6,7 @@ const NEW_WORKSHOP = "__new";
 const app = { data: null, status: null, selected: NEW_WORKSHOP, draft: emptyDraft() };
 
 function emptyDraft() {
-  return { id: "", title: "", contents: [], userStart: 1, userCount: 20, isNew: true };
+  return { id: "", title: "", contents: [], userStart: 1, userCount: 20, homeTitle: "", homePage: "", homeLabel: "", contentLabels: {}, navLinksText: "", isNew: true };
 }
 
 // ── 공통 유틸 ──────────────────────────────────────────
@@ -102,7 +102,11 @@ async function loadState() {
 function selectWorkshop(id) {
   app.selected = id;
   const saved = app.data?.workshops[id];
-  app.draft = saved ? { ...saved, contents: [...saved.contents], id, isNew: false } : emptyDraft();
+  app.draft = saved ? {
+    ...emptyDraft(), ...saved, contents: [...saved.contents], id, isNew: false,
+    contentLabels: { ...(saved.contentLabels || {}) },
+    navLinksText: (saved.navLinks || []).map((link) => `${link.name} | ${link.url}`).join("\n"),
+  } : emptyDraft();
 }
 
 // ── 렌더링 ──────────────────────────────────────────
@@ -164,6 +168,11 @@ function renderComposer() {
   fields.id.disabled = !draft.isNew;
   fields.userStart.value = draft.userStart;
   fields.userCount.value = draft.userCount;
+  fields.homeTitle.value = draft.homeTitle;
+  fields.homeLabel.value = draft.homeLabel;
+  fields.navLinks.value = draft.navLinksText;
+  fields.homeTitle.placeholder = draft.title || t("ph.wsTitle");
+  $("home-editor").open = isHomeCustomized(draft);
   $("btn-delete-workshop").hidden = draft.isNew;
   renderUserRange();
   renderContentLists();
@@ -183,6 +192,58 @@ function moveContent(index, offset) {
   renderContentLists();
 }
 
+function isHomeCustomized(draft) {
+  return Boolean(draft.homeTitle.trim() || draft.homePage.trim() || draft.homeLabel.trim()
+    || draft.navLinksText.trim() || Object.values(draft.contentLabels).some((label) => label.trim()));
+}
+
+/** 미리 보기용 링크 목록. 아직 입력 중인 잘못된 줄은 건너뛴다(저장할 때 검사). */
+function previewLinks(text) {
+  return text.split("\n").map((line) => line.split("|")).filter((parts) => parts.length > 1 && parts[0].trim())
+    .map(([name, ...url]) => ({ name: name.trim(), url: url.join("|").trim() }));
+}
+
+function contentLabel(name) {
+  return app.draft.contentLabels[name]?.trim() || app.data.catalog[name]?.title || name;
+}
+
+/** 콘텐츠마다 표시 이름 입력칸. 포함된 콘텐츠가 바뀔 때 다시 그린다. */
+function renderContentLabelInputs() {
+  const rows = app.draft.contents.map((name) => h("label", { class: "content-label-row" },
+    h("small", {}, name),
+    h("input", {
+      maxlength: "60", value: app.draft.contentLabels[name] || "", placeholder: app.data.catalog[name]?.title || name,
+      oninput: (event) => {
+        app.draft = { ...app.draft, contentLabels: { ...app.draft.contentLabels, [name]: event.target.value } };
+        renderHomePreview();
+      },
+    })));
+  $("content-labels").replaceChildren(...(rows.length ? rows : [h("p", { class: "empty" }, t("ws.selectedEmpty"))]));
+}
+
+/** 자동으로 만드는 첫 화면. 차트의 showroom.homeIndex 와 같은 형식이다. */
+function defaultHomePage() {
+  const { title, homeTitle, contents } = app.draft;
+  return [`= ${homeTitle.trim() || title || t("ph.wsTitle")}`, "", t("home.defaultIntro"), "",
+    ...contents.map((name) => `* xref:${name}::index.adoc[${contentLabel(name)}]`), ""].join("\n");
+}
+
+/** 왼쪽 목차 미리 보기와 첫 화면 상태 */
+function renderHomePreview() {
+  const { title, homeTitle, homeLabel, contents, navLinksText, homePage } = app.draft;
+  $("nav-preview-title").textContent = homeTitle.trim() || title || t("ph.wsTitle");
+  $("nav-preview-list").replaceChildren(
+    h("li", { class: "current" }, homeLabel.trim() || t("home.defaultLabel")),
+    ...contents.map((name) => h("li", {}, contentLabel(name))),
+    ...previewLinks(navLinksText).map((link) => h("li", { class: "external", title: link.url }, `${link.name} ↗`)));
+  const state = $("home-page-state");
+  state.textContent = homePage.trim() ? t("home.pageCustom") : t("home.pageAuto");
+  state.classList.toggle("custom", Boolean(homePage.trim()));
+  $("btn-home-page").disabled = app.draft.isNew;
+  $("btn-home-page").title = app.draft.isNew ? t("pages.needSave") : "";
+  $("home-summary").textContent = isHomeCustomized(app.draft) ? `· ${t("home.custom")}` : "";
+}
+
 function renderContentLists() {
   const { catalog } = app.data;
   const { contents } = app.draft;
@@ -199,6 +260,8 @@ function renderContentLists() {
       }, "✕"))
   ) : [h("li", { class: "empty-row" }, h("p", { class: "empty" }, t("ws.selectedEmpty")))]));
 
+  renderContentLabelInputs();
+  renderHomePreview();
   const available = Object.keys(catalog).filter((name) => !contents.includes(name));
   $("available-list").replaceChildren(...(available.length ? available.map((name) =>
     h("li", {},
@@ -279,8 +342,13 @@ async function saveDraft() {
   const form = $("workshop-form");
   if (!form.reportValidity()) throw new Error(t("err.invalid"));
   if (!app.draft.contents.length) throw new Error(t("err.needContent"));
-  const { id, title, contents, userStart, userCount } = app.draft;
-  await api("PUT", `/api/workshops/${id}`, { title, contents, userStart: Number(userStart), userCount: Number(userCount) });
+  const { id, title, contents, userStart, userCount, homeTitle, homePage, homeLabel, contentLabels, navLinksText } = app.draft;
+  const navLinks = parseLines(navLinksText, "|").map(([name, url]) => ({ name, url }));
+  const labels = Object.fromEntries(contents.map((name) => [name, (contentLabels[name] || "").trim()]).filter(([, label]) => label));
+  await api("PUT", `/api/workshops/${id}`, {
+    title, contents, userStart: Number(userStart), userCount: Number(userCount),
+    homeTitle, homePage, homeLabel, contentLabels: labels, navLinks,
+  });
   app.selected = id;
   await loadState();
   return id;
@@ -290,9 +358,16 @@ function bindEvents() {
   const form = $("workshop-form");
   form.addEventListener("input", (event) => {
     const { name, value } = event.target;
-    if (["title", "id", "userStart", "userCount"].includes(name)) {
+    if (name === "navLinks") {
+      app.draft = { ...app.draft, navLinksText: value };
+      renderHomePreview();
+      return;
+    }
+    if (["title", "id", "userStart", "userCount", "homeTitle", "homeLabel"].includes(name)) {
       app.draft = { ...app.draft, [name]: value };
       if (name.startsWith("user")) renderUserRange();
+      if (["title", "userStart"].includes(name)) $("workshop-form").elements.homeTitle.placeholder = app.draft.title || t("ph.wsTitle");
+      renderHomePreview();
     }
   });
   form.addEventListener("submit", (event) => {

@@ -37,6 +37,16 @@ contents: {}
 # 통합 Antora 사이트
 site:
   title: Red Hat AI Workshop
+  # 첫 화면(home) 제목. 비우면 title 을 쓴다.
+  homeTitle: ""
+  # 첫 화면 소개 문구(AsciiDoc). 아래에 포함된 워크샵 목록이 자동으로 붙는다.
+  homeIntro: "`{user}` 님, 환영합니다. 진행할 워크샵을 선택하세요."
+  # 첫 화면 전체(AsciiDoc). 값이 있으면 위 제목·소개·자동 목록 대신 그대로 쓴다.
+  homePage: ""
+  # 왼쪽 목차의 첫 항목 이름
+  homeLabel: 워크샵 홈
+  # 왼쪽 목차 끝에 붙는 링크 [{name, url}] (새 창으로 열림)
+  navLinks: []
   uiBundleUrl: https://github.com/rhpds/rhdp_showroom_theme/releases/download/latest/ui-bundle.zip
 
 # Showroom(nookbag) 화면. 모듈별 tabs는 이 목록 뒤에 이름 중복 없이 추가된다.

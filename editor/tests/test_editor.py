@@ -300,3 +300,57 @@ def test_page_api_lists_saves_and_flags_stale_source(tmp_path, monkeypatch):
     _git_repo(source, {"content/modules/ROOT/pages/index.adoc": "= 원본 v2\n"})
 
     assert client.get("/api/workshops/ws/pages/agentops").json()["pages"][0] == {"path": page, "edited": True, "stale": True}
+
+
+# ── 왼쪽 목차 · 첫 화면 ──────────────────────────────────────────
+@pytest.mark.parametrize("extra", [
+    {"homeTitle": "두 줄\n제목"},
+    {"homeLabel": "홈]"},
+    {"contentLabels": {"agentops": "a]b"}},
+    {"navLinks": [{"name": "설문", "url": "javascript:alert(1)"}]},
+    {"navLinks": [{"name": "설문", "url": "https://x.com/a]b"}]},
+])
+def test_workshop_rejects_labels_that_break_navigation(extra):
+    with pytest.raises(ValidationError):
+        WorkshopIn(**WORKSHOP, **extra)
+
+
+def test_build_values_applies_nav_customization():
+    workshop = {**WORKSHOP, "homeTitle": "BC카드 AI 데이", "homeLabel": "시작", "homePage": "",
+                "contentLabels": {"agentops": "2부 · 관찰성"},
+                "navLinks": [{"name": "설문", "url": "https://forms.example.com/a"}]}
+
+    values = deployer.build_values(STATE, workshop, "deploy", CLUSTER)
+
+    assert values["site"] == {"title": "BC카드 핸즈온", "homeTitle": "BC카드 AI 데이", "homeLabel": "시작",
+                              "navLinks": [{"name": "설문", "url": "https://forms.example.com/a"}]}
+    assert values["contents"]["agentops"]["title"] == "2부 · 관찰성"
+    assert values["contents"]["inference"]["title"] == "Inference"
+
+
+@pytest.mark.skipif(shutil.which("helm") is None, reason="helm 이 없으면 건너뛴다")
+def test_render_nav_uses_custom_title_labels_and_links():
+    import yaml
+
+    workshop = {**WORKSHOP, "userCount": 1, "homeTitle": "BC카드 AI 데이", "homeLabel": "시작",
+                "contentLabels": {"agentops": "2부"}, "navLinks": [{"name": "설문", "url": "https://f.example.com/a"}]}
+    site = next(d for d in yaml.safe_load_all(deployer.render(deployer.build_values(STATE, workshop, "deploy", CLUSTER)))
+                if d and d["kind"] == "ConfigMap" and d["metadata"]["name"] == "showroom-site")
+
+    assert site["data"]["home-nav.adoc"].splitlines() == [
+        "* xref:index.adoc[시작]", "* xref:agentops::index.adoc[2부]",
+        "* xref:inference::index.adoc[Inference]", "* link:https://f.example.com/a[설문,window=_blank]"]
+    assert 'title: "BC카드 AI 데이"' in site["data"]["home-antora.yml"]
+    assert site["data"]["home-index.adoc"].startswith("= BC카드 AI 데이\n\n`{user}` 님, 환영합니다.")
+
+
+@pytest.mark.skipif(shutil.which("helm") is None, reason="helm 이 없으면 건너뛴다")
+def test_render_uses_edited_home_page_verbatim():
+    import yaml
+
+    page = "= 환영합니다\n\n[NOTE]\n====\n오늘 일정: 10시 시작 {user}\n====\n\n* xref:agentops::index.adoc[관찰성]\n"
+    values = deployer.build_values(STATE, {**WORKSHOP, "userCount": 1, "homePage": page}, "deploy", CLUSTER)
+    site = next(d for d in yaml.safe_load_all(deployer.render(values))
+                if d and d["kind"] == "ConfigMap" and d["metadata"]["name"] == "showroom-site")
+
+    assert site["data"]["home-index.adoc"].rstrip("\n") == page.rstrip("\n")

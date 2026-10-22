@@ -19,6 +19,12 @@ def cluster_info() -> dict:
     return {"domain": domain.strip(), "apiUrl": api_url.strip()}
 
 
+def _home(workshop: dict) -> dict:
+    """첫 화면 값. 비어 있으면 차트 기본값(워크샵 제목, 환영 문구)을 쓰도록 넘기지 않는다."""
+    home = {key: workshop.get(key, "").strip() for key in ("homeTitle", "homePage", "homeLabel")}
+    return {**{key: value for key, value in home.items() if value}, "navLinks": workshop.get("navLinks", [])}
+
+
 def build_values(state: dict, workshop: dict, role: str, cluster: dict, overlays: dict | None = None) -> dict:
     """overlays: {콘텐츠 이름: {파일 경로: {text, ...}}} — 빌드할 때 원본 위에 덮어쓸 페이지"""
     overlays = overlays or {}
@@ -31,7 +37,7 @@ def build_values(state: dict, workshop: dict, role: str, cluster: dict, overlays
             "repoUrl": entry["repoUrl"],
             "repoRef": entry["repoRef"],
             "startPath": entry["startPath"],
-            "title": entry["title"],
+            "title": workshop.get("contentLabels", {}).get(name) or entry["title"],
             "order": (index + 1) * ORDER_STEP,
             "tabs": entry.get("tabs", []),
             "attributes": entry.get("attributes", {}),
@@ -44,7 +50,7 @@ def build_values(state: dict, workshop: dict, role: str, cluster: dict, overlays
         users = {"prefix": "preview", "start": 1, "count": 1}
     return {
         "cluster": cluster,
-        "site": {"title": workshop["title"]},
+        "site": {"title": workshop["title"], **_home(workshop)},
         "users": users,
         "contents": contents,
         "namespaceLabels": {ROLE_LABEL: role},

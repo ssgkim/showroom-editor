@@ -55,11 +55,54 @@ class CatalogIn(BaseModel):
         return value
 
 
+# 목차 항목 이름은 AsciiDoc 링크 대괄호 안에 들어가므로 ] 와 줄바꿈을 막는다
+LABEL_PATTERN = r"^[^\]\r\n]+$"
+
+
+def _label(value: str) -> str:
+    value = value.strip()
+    if value and not re.fullmatch(LABEL_PATTERN, value):
+        raise ValueError("이름에는 ] 와 줄바꿈을 쓸 수 없습니다")
+    if len(value) > 60:
+        raise ValueError("이름은 60자 이하여야 합니다")
+    return value
+
+
+class NavLink(BaseModel):
+    name: str = Field(min_length=1, max_length=60, pattern=LABEL_PATTERN)
+    url: str = Field(pattern=r"^https://[^\s\[\]]+$", max_length=500)
+
+
 class WorkshopIn(BaseModel):
     title: str = Field(min_length=1, max_length=100)
     contents: list[str] = Field(min_length=1, max_length=20)
     userStart: int = Field(default=1, ge=1, le=1000)
     userCount: int = Field(default=20, ge=1, le=200)
+    # Showroom 첫 화면. 비우면 워크샵 제목과 기본 환영 문구를 쓴다.
+    homeTitle: str = Field(default="", max_length=120)
+    # 첫 화면 전체(AsciiDoc). 비우면 제목·환영 문구·콘텐츠 목록을 자동으로 만든다
+    homePage: str = Field(default="", max_length=50_000)
+    homeLabel: str = Field(default="", max_length=60)
+    # 목차·첫 화면에 표시할 콘텐츠 이름 {콘텐츠: 이름}. 없으면 카탈로그 제목
+    contentLabels: dict[str, str] = Field(default_factory=dict)
+    navLinks: list[NavLink] = Field(default_factory=list, max_length=10)
+
+    @field_validator("homeLabel")
+    @classmethod
+    def valid_home_label(cls, value: str) -> str:
+        return _label(value)
+
+    @field_validator("contentLabels")
+    @classmethod
+    def valid_content_labels(cls, value: dict[str, str]) -> dict[str, str]:
+        return {name: label for name, label in ((n, _label(v)) for n, v in value.items()) if label}
+
+    @field_validator("homeTitle")
+    @classmethod
+    def single_line(cls, value: str) -> str:
+        if "\n" in value or "\r" in value:
+            raise ValueError("목차 제목은 한 줄이어야 합니다")
+        return value.strip()
 
 
 class PageIn(BaseModel):

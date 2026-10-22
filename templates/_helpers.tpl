@@ -149,7 +149,7 @@ home 컴포넌트: 등록된 워크샵 목록
 */}}
 {{- define "showroom.homeAntora" -}}
 name: home
-title: {{ .root.Values.site.title | quote }}
+title: {{ .root.Values.site.homeTitle | default .root.Values.site.title | quote }}
 version: main
 nav:
   - modules/ROOT/nav.adoc
@@ -159,18 +159,25 @@ asciidoc:
 {{- end -}}
 
 {{- define "showroom.homeIndex" -}}
-= {{ .root.Values.site.title }}
+{{- if .root.Values.site.homePage }}
+{{- .root.Values.site.homePage }}
+{{- else -}}
+= {{ .root.Values.site.homeTitle | default .root.Values.site.title }}
 
-`{user}` 님, 환영합니다. 진행할 워크샵을 선택하세요.
+{{ .root.Values.site.homeIntro }}
 
 {{ range .modules -}}
 * xref:{{ .key }}::index.adoc[{{ .title }}]
 {{ end }}
+{{- end }}
 {{- end -}}
 
 {{- define "showroom.homeNav" -}}
-* xref:index.adoc[워크샵 홈]
+* xref:index.adoc[{{ .root.Values.site.homeLabel | default "워크샵 홈" }}]
 {{ range .modules -}}
 * xref:{{ .key }}::index.adoc[{{ .title }}]
+{{ end }}
+{{- range .root.Values.site.navLinks -}}
+* link:{{ .url }}[{{ .name }},window=_blank]
 {{ end }}
 {{- end -}}
