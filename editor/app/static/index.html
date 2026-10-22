@@ -138,8 +138,40 @@
     </section>
   </main>
 
+  <dialog class="page-dialog" id="page-dialog" aria-labelledby="page-dialog-title">
+    <header class="page-head">
+      <div>
+        <h2 id="page-dialog-title"></h2>
+        <p class="page-sub"><span data-i18n="pages.desc"></span> <code id="page-commit"></code></p>
+      </div>
+      <button type="button" class="btn btn-text" id="btn-page-close" data-i18n="btn.close"></button>
+    </header>
+    <div class="page-body">
+      <nav aria-label="Pages"><ul class="page-list" id="page-list"></ul></nav>
+      <p class="page-empty" id="page-empty" data-i18n="pages.pick"></p>
+      <form class="page-work" id="page-work" hidden>
+        <div class="page-bar">
+          <code id="page-path"></code>
+          <span class="page-state" id="page-state"></span>
+          <label class="page-toggle"><input type="checkbox" id="page-compare"> <span data-i18n="pages.compare"></span></label>
+        </div>
+        <p class="page-stale" id="page-stale" data-i18n="pages.stale" hidden></p>
+        <div class="page-panes">
+          <textarea id="page-text" spellcheck="false" aria-label="AsciiDoc"></textarea>
+          <pre class="page-original" id="page-original" aria-label="Original"></pre>
+        </div>
+        <div class="page-actions">
+          <p class="hint" data-i18n="pages.hint"></p>
+          <button type="button" class="btn btn-text danger" id="btn-page-revert" data-i18n="pages.revert" data-i18n-confirm="pages.confirmRevert"></button>
+          <button type="submit" class="btn btn-ink" id="btn-page-save" data-i18n="btn.save"></button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="/static/i18n.js" defer></script>
   <script src="/static/app.js" defer></script>
+  <script src="/static/pages.js" defer></script>
 </body>
 </html>

@@ -12,7 +12,12 @@
 {{- if not (and (kindIs "map" $raw) $raw.repoUrl) }}
 {{- fail (printf "contents.%s: repoUrl 이 없습니다" $key) }}
 {{- end }}
-{{- $m := merge (deepCopy $raw) (dict "key" $key "title" $key "repoRef" "main" "startPath" "content" "order" 100 "tabs" (list) "attributes" (dict)) }}
+{{- $m := merge (deepCopy $raw) (dict "key" $key "title" $key "repoRef" "main" "startPath" "content" "order" 100 "tabs" (list) "attributes" (dict) "overlays" (list)) }}
+{{- range $m.overlays }}
+{{- if or (not (regexMatch "^[A-Za-z0-9._/-]+\\.adoc$" (toString .path))) (contains ".." (toString .path)) (hasPrefix "/" (toString .path)) }}
+{{- fail (printf "contents.%s.overlays: 잘못된 경로 %v" $key .path) }}
+{{- end }}
+{{- end }}
 {{- $sortKey := printf "%06d-%s" (int $m.order) $key }}
 {{- $_ := set $byKey $sortKey $m }}
 {{- $sortKeys = append $sortKeys $sortKey }}
@@ -109,6 +114,18 @@ modules.txt: |
   {{- range .modules }}
   {{ .key }} {{ .repoUrl }} {{ .repoRef }} {{ .startPath }}
   {{- end }}
+# 행사별 페이지 수정: "<콘텐츠> <번호> <경로>" 와 파일 본문 (clone 뒤 원본 위에 덮어쓴다)
+overlays.txt: |
+  {{- range $m := .modules }}
+  {{- range $i, $o := $m.overlays }}
+  {{ $m.key }} {{ $i }} {{ $o.path }}
+  {{- end }}
+  {{- end }}
+{{- range $m := .modules }}
+{{- range $i, $o := $m.overlays }}
+overlay-{{ $m.key }}-{{ $i }}.adoc: {{ $o.text | toJson }}
+{{- end }}
+{{- end }}
 {{- range .modules }}
 attrs-{{ .key }}.yml: |
   {{- include "showroom.attributes" (dict "common" $.root.Values.commonAttributes "extra" .attributes "ctx" $.ctx) | nindent 2 }}

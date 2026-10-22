@@ -175,3 +175,127 @@ def test_links_point_to_ops_hub_route(monkeypatch):
 
     assert response.json() == {"opsHub": "https://ops.apps.example.com"}
     assert calls[0][:5] == ["get", "route", "workshop-ops", "-n", "workshop-ops"]
+
+
+# ── 행사별 페이지 수정 ──────────────────────────────────────────
+@pytest.mark.parametrize("path", [
+    "content/modules/ROOT/pages/index.adoc",
+    "content/modules/ROOT/partials/vars.adoc",
+])
+def test_page_path_accepts_adoc_under_start_path(path):
+    from app import repofiles
+
+    assert repofiles.check_page_path(path, "content") == path
+
+
+@pytest.mark.parametrize("path", [
+    "content/../secret.adoc", "/etc/passwd.adoc", "other/modules/x.adoc",
+    "content/modules/ROOT/pages/x.yml", "content/modules/ROOT/pages/a b.adoc", "",
+])
+def test_page_path_rejects_outside_or_non_adoc(path):
+    from app import repofiles
+
+    with pytest.raises(ValueError):
+        repofiles.check_page_path(path, "content")
+
+
+def test_blob_sha_matches_git():
+    from app import repofiles
+
+    # git hash-object 와 같은 값 (printf 'hello\n' | git hash-object --stdin)
+    assert repofiles.blob_sha(b"hello\n") == "ce013625030ba8dba906f756967f9e9ca394464a"
+
+
+def test_read_page_refuses_symlink_escape(tmp_path):
+    from app import repofiles
+
+    repo = tmp_path / "repo"
+    (repo / "content").mkdir(parents=True)
+    (tmp_path / "secret.adoc").write_text("secret")
+    (repo / "content" / "link.adoc").symlink_to(tmp_path / "secret.adoc")
+
+    with pytest.raises(FileNotFoundError):
+        repofiles.read_page(repo, "content/link.adoc")
+
+
+def test_build_values_passes_overlays_for_included_contents_only():
+    overlays = {"agentops": {"content/modules/ROOT/pages/b.adoc": {"text": "B"},
+                             "content/modules/ROOT/pages/a.adoc": {"text": "A"}},
+                "removed": {"content/x.adoc": {"text": "X"}}}
+
+    values = deployer.build_values(STATE, WORKSHOP, "deploy", CLUSTER, overlays)
+
+    assert [o["path"] for o in values["contents"]["agentops"]["overlays"]] == [
+        "content/modules/ROOT/pages/a.adoc", "content/modules/ROOT/pages/b.adoc"]
+    assert values["contents"]["inference"]["overlays"] == []
+    assert "removed" not in values["contents"]
+
+
+@pytest.mark.skipif(shutil.which("helm") is None, reason="helm 이 없으면 건너뛴다")
+def test_render_puts_overlay_files_into_site_configmap():
+    import yaml
+
+    text = '= 제목 {{ .user }}\n[source]\n----\nkey: "v" # <tag> & \'q\'\n----\n'
+    values = deployer.build_values(STATE, {**WORKSHOP, "userCount": 1}, "deploy", CLUSTER,
+                                   {"agentops": {"content/modules/ROOT/pages/index.adoc": {"text": text}}})
+
+    site = next(d for d in yaml.safe_load_all(deployer.render(values))
+                if d and d["kind"] == "ConfigMap" and d["metadata"]["name"] == "showroom-site")
+
+    assert site["data"]["overlays.txt"].strip() == "agentops 0 content/modules/ROOT/pages/index.adoc"
+    assert site["data"]["overlay-agentops-0.adoc"] == text
+
+
+def test_overlay_store_removes_empty_branches(monkeypatch):
+    from app import overlays
+
+    data = {"ws": {"agentops": {"p.adoc": {"text": "x"}}}}
+    saved = []
+    monkeypatch.setattr(overlays, "load_all", lambda: data)
+    monkeypatch.setattr(overlays, "_save", saved.append)
+
+    overlays.remove("ws", "agentops", "p.adoc")
+
+    assert saved == [{}]
+    assert data == {"ws": {"agentops": {"p.adoc": {"text": "x"}}}}  # 원본은 바꾸지 않는다
+
+
+def _git_repo(path, files):
+    import subprocess
+    for name, text in files.items():
+        (path / name).parent.mkdir(parents=True, exist_ok=True)
+        (path / name).write_text(text)
+    for args in (["init", "-q", "-b", "main"], ["add", "-A"],
+                 ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "c"]):
+        subprocess.run(["git", *args], cwd=path, check=True)
+
+
+def test_page_api_lists_saves_and_flags_stale_source(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from app import main, overlays, repofiles, store
+
+    source = tmp_path / "src"
+    source.mkdir()
+    _git_repo(source, {"content/antora.yml": "name: x\n", "content/modules/ROOT/pages/index.adoc": "= 원본\n"})
+    monkeypatch.setattr(repofiles, "CACHE_DIR", tmp_path / "cache")
+    state = {**STATE, "catalog": {"agentops": {**STATE["catalog"]["agentops"], "repoUrl": str(source), "repoRef": "main"}},
+             "workshops": {"ws": {**WORKSHOP, "contents": ["agentops"]}}}
+    saved = {}
+    monkeypatch.setattr(store, "load", lambda: state)
+    monkeypatch.setattr(overlays, "load_all", lambda: saved.get("data", {}))
+    monkeypatch.setattr(overlays, "_save", lambda data: saved.update(data=data))
+    client = TestClient(main.create_app())
+    page = "content/modules/ROOT/pages/index.adoc"
+
+    assert client.get("/api/workshops/ws/pages/agentops").json()["pages"] == [
+        {"path": page, "edited": False, "stale": False}]
+    assert client.put("/api/workshops/ws/pages/agentops/file", json={"path": page, "text": "= 원본\n"}).status_code == 400
+    assert client.put("/api/workshops/ws/pages/agentops/file", json={"path": page, "text": "= 행사용\n"}).status_code == 200
+    assert client.get("/api/workshops/ws/pages/agentops/file", params={"path": page}).json()["edited"] == "= 행사용\n"
+    assert client.get("/api/workshops/ws/pages/agentops/file", params={"path": "../x.adoc"}).status_code == 400
+    assert client.get("/api/workshops/ws/pages/inference").status_code == 404
+
+    _git_repo(source, {"content/modules/ROOT/pages/index.adoc": "= 원본 v2\n"})
+
+    assert client.get("/api/workshops/ws/pages/agentops").json()["pages"][0] == {"path": page, "edited": True, "stale": True}

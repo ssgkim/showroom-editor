@@ -17,6 +17,16 @@ while read -r key url ref path; do
   git clone --quiet --depth 1 --branch "$ref" "$url" "$SOURCES/$key"
 done < /config/modules.txt
 
+# 행사별 페이지 수정(Showroom Editor). 원본 저장소는 바꾸지 않고 clone 한 파일만 덮어쓴다.
+while read -r key idx path; do
+  [ -n "$key" ] || continue
+  case "$path" in
+    /*|*..*) echo "[overlay] 오류: 잘못된 경로 $path" >&2; exit 1 ;;
+  esac
+  echo "[overlay] $key: $path"
+  cp "/config/overlay-$key-$idx.adoc" "$SOURCES/$key/$path"
+done < /config/overlays.txt
+
 cp /config/site.yml "$REPO/site.yml"
 cp /config/home-antora.yml "$REPO/home/antora.yml"
 cp /config/home-index.adoc "$REPO/home/modules/ROOT/pages/index.adoc"

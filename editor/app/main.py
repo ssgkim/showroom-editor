@@ -9,9 +9,9 @@ from fastapi import FastAPI, HTTPException, Path as PathParam
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import deployer, gitcheck, status, store
+from . import deployer, gitcheck, overlays, repofiles, status, store
 from .kube import KubeError, route_url
-from .schemas import NAME_PATTERN, CatalogIn, WorkshopIn
+from .schemas import NAME_PATTERN, CatalogIn, PageIn, WorkshopIn
 
 logger = logging.getLogger("showroom-editor")
 STATIC_DIR = Path(__file__).parent / "static"
@@ -46,7 +46,7 @@ def _apply_workshop(wid: str, role: str) -> dict:
     state = store.load()
     workshop = _workshop_or_404(state, wid)
     try:
-        values = deployer.build_values(state, workshop, role, _cluster())
+        values = deployer.build_values(state, workshop, role, _cluster(), overlays.for_workshop(wid))
         result = deployer.apply(values, role)
     except ValueError as exc:
         raise _fail(exc, 400) from exc
@@ -55,6 +55,27 @@ def _apply_workshop(wid: str, role: str) -> dict:
     record = {"workshop": wid, "title": workshop["title"], "contents": workshop["contents"], "at": _now()}
     store.update(lambda s: {**s, role: record})
     return {**result, "record": record}
+
+
+def _content_repo(wid: str, content: str) -> tuple[dict, Path, str]:
+    """워크샵에 포함된 콘텐츠의 (카탈로그 항목, 저장소 작업 디렉터리, 커밋)."""
+    state = store.load()
+    workshop = _workshop_or_404(state, wid)
+    entry = state["catalog"].get(content)
+    if entry is None or content not in workshop["contents"]:
+        raise HTTPException(status_code=404, detail=f"워크샵에 포함되지 않은 콘텐츠입니다: {content}")
+    try:
+        repo, commit = repofiles.checkout(entry["repoUrl"], entry["repoRef"])
+    except gitcheck.RepoError as exc:
+        raise _fail(exc, 502) from exc
+    return entry, repo, commit
+
+
+def _checked_path(entry: dict, path: str) -> str:
+    try:
+        return repofiles.check_page_path(path, entry["startPath"])
+    except ValueError as exc:
+        raise _fail(exc, 400) from exc
 
 
 def create_app() -> FastAPI:
@@ -67,7 +88,7 @@ def create_app() -> FastAPI:
     @app.get("/api/state")
     def get_state() -> dict:
         try:
-            return {**store.load(), "cluster": _cluster()}
+            return {**store.load(), "cluster": _cluster(), "edits": overlays.counts(overlays.load_all())}
         except KubeError as exc:
             raise _fail(exc) from exc
 
@@ -109,6 +130,7 @@ def create_app() -> FastAPI:
         if deployed.get("workshop") == wid:
             raise HTTPException(status_code=409, detail="배포 중인 워크샵은 삭제할 수 없습니다. 먼저 배포를 해제하세요")
         store.update(lambda s: {**s, "workshops": {k: v for k, v in s["workshops"].items() if k != wid}})
+        overlays.drop_workshop(wid)
         return {"deleted": wid}
 
     @app.post("/api/workshops/{wid}/preview")
@@ -150,6 +172,55 @@ def create_app() -> FastAPI:
             raise _fail(exc, 403) from exc
         except KubeError as exc:
             raise _fail(exc) from exc
+
+    @app.get("/api/workshops/{wid}/pages/{content}")
+    def list_pages(wid: Name, content: Name) -> dict:
+        entry, repo, commit = _content_repo(wid, content)
+        edited = overlays.for_workshop(wid).get(content, {})
+        pages = []
+        for path in repofiles.list_pages(repo, entry["startPath"]):
+            item = edited.get(path)
+            stale = bool(item) and repofiles.read_page(repo, path)[1] != item["baseSha"]
+            pages.append({"path": path, "edited": bool(item), "stale": stale})
+        missing = [{"path": p, "edited": True, "stale": True} for p in edited if p not in {x["path"] for x in pages}]
+        return {"commit": commit[:12], "pages": pages + missing}
+
+    @app.get("/api/workshops/{wid}/pages/{content}/file")
+    def get_page(wid: Name, content: Name, path: str) -> dict:
+        entry, repo, _commit = _content_repo(wid, content)
+        path = _checked_path(entry, path)
+        try:
+            original, sha = repofiles.read_page(repo, path)
+        except FileNotFoundError:
+            original, sha = None, None
+        item = overlays.for_workshop(wid).get(content, {}).get(path)
+        return {"path": path, "original": original, "edited": item["text"] if item else None,
+                "updatedAt": item["updatedAt"] if item else None,
+                "stale": bool(item) and item["baseSha"] != sha}
+
+    @app.put("/api/workshops/{wid}/pages/{content}/file")
+    def put_page(wid: Name, content: Name, body: PageIn) -> dict:
+        entry, repo, _commit = _content_repo(wid, content)
+        path = _checked_path(entry, body.path)
+        try:
+            original, sha = repofiles.read_page(repo, path)
+        except FileNotFoundError as exc:
+            raise _fail(ValueError(f"원본 저장소에 없는 파일입니다: {path}"), 404) from exc
+        if body.text == original:
+            raise HTTPException(status_code=400, detail="원본과 같습니다. 되돌리려면 '원본으로 되돌리기'를 누르세요")
+        try:
+            overlays.put(wid, content, path, {"text": body.text, "baseSha": sha, "updatedAt": _now()})
+        except ValueError as exc:
+            raise _fail(exc, 413) from exc
+        except KubeError as exc:
+            raise _fail(exc) from exc
+        return {"saved": path}
+
+    @app.delete("/api/workshops/{wid}/pages/{content}/file")
+    def delete_page(wid: Name, content: Name, path: str) -> dict:
+        _workshop_or_404(store.load(), wid)
+        overlays.remove(wid, content, path)
+        return {"reverted": path}
 
     @app.get("/api/links")
     def links() -> dict:

@@ -19,7 +19,9 @@ def cluster_info() -> dict:
     return {"domain": domain.strip(), "apiUrl": api_url.strip()}
 
 
-def build_values(state: dict, workshop: dict, role: str, cluster: dict) -> dict:
+def build_values(state: dict, workshop: dict, role: str, cluster: dict, overlays: dict | None = None) -> dict:
+    """overlays: {콘텐츠 이름: {파일 경로: {text, ...}}} — 빌드할 때 원본 위에 덮어쓸 페이지"""
+    overlays = overlays or {}
     contents = {}
     for index, name in enumerate(workshop["contents"]):
         entry = state["catalog"].get(name)
@@ -33,6 +35,8 @@ def build_values(state: dict, workshop: dict, role: str, cluster: dict) -> dict:
             "order": (index + 1) * ORDER_STEP,
             "tabs": entry.get("tabs", []),
             "attributes": entry.get("attributes", {}),
+            "overlays": [{"path": path, "text": item["text"]}
+                         for path, item in sorted(overlays.get(name, {}).items())],
         }
     if role == "deploy":
         users = {"prefix": "user", "start": workshop["userStart"], "count": workshop["userCount"]}

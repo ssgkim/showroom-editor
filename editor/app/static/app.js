@@ -190,6 +190,7 @@ function renderContentLists() {
   $("selected-list").replaceChildren(...(contents.length ? contents.map((name, index) =>
     h("li", {},
       h("span", { class: "label" }, catalog[name]?.title || name, h("small", {}, name)),
+      editPagesButton(name),
       h("button", { type: "button", class: "icon-btn", title: t("action.up"), disabled: index === 0, onclick: () => moveContent(index, -1) }, "↑"),
       h("button", { type: "button", class: "icon-btn", title: t("action.down"), disabled: index === contents.length - 1, onclick: () => moveContent(index, 1) }, "↓"),
       h("button", {
@@ -207,6 +208,18 @@ function renderContentLists() {
         onclick: () => { app.draft = { ...app.draft, contents: [...contents, name] }; renderContentLists(); },
       }, "+"))
   ) : [h("li", { class: "empty-row" }, h("p", { class: "empty" }, t("ws.availableEmpty")))]));
+}
+
+/** 저장된 워크샵에 들어 있는 콘텐츠만 페이지를 수정할 수 있다 (수정 내용이 워크샵 ID 에 묶인다). */
+function editPagesButton(name) {
+  const saved = app.data.workshops[app.draft.id];
+  const ready = !app.draft.isNew && saved?.contents.includes(name);
+  const count = app.data.edits?.[app.draft.id]?.[name] || 0;
+  return h("button", {
+    type: "button", class: "page-open", disabled: !ready,
+    title: ready ? t("pages.open") : t("pages.needSave"),
+    onclick: () => openPageEditor(name),
+  }, "✎", count ? h("span", { class: "page-count" }, String(count)) : null);
 }
 
 function renderRunMeta() {

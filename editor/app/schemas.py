@@ -60,3 +60,9 @@ class WorkshopIn(BaseModel):
     contents: list[str] = Field(min_length=1, max_length=20)
     userStart: int = Field(default=1, ge=1, le=1000)
     userCount: int = Field(default=20, ge=1, le=200)
+
+
+class PageIn(BaseModel):
+    """행사별 페이지 수정. 경로 검사는 콘텐츠 경로를 알아야 하므로 API 에서 한다."""
+    path: str = Field(min_length=1, max_length=300)
+    text: str = Field(max_length=200_000)
