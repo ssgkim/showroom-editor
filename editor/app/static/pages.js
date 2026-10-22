@@ -6,8 +6,11 @@
  */
 const pageEditor = { wid: null, content: null, pages: [], path: null, file: null, dirty: false, armedPath: null };
 
-function shortPath(path) {
-  return path.replace(/^.*?modules\//, "");
+/** "content/modules/ROOT/pages/kr/a.adoc" → ["kr/", "a.adoc"]. 모듈이 ROOT 가 아니면 모듈 이름을 앞에 둔다. */
+function splitPagePath(path) {
+  const rest = path.replace(/^.*?modules\//, "").replace(/^ROOT\//, "").replace(/(^|\/)pages\//, "$1");
+  const cut = rest.lastIndexOf("/") + 1;
+  return [rest.slice(0, cut), rest.slice(cut)];
 }
 
 async function openPageEditor(content) {
@@ -38,7 +41,7 @@ function renderPageList() {
       type: "button", class: "page-pick", "aria-current": String(page.path === pageEditor.path),
       title: page.path, onclick: () => selectPage(page.path),
     },
-    h("span", { class: "page-name" }, shortPath(page.path)),
+    h("span", { class: "page-name" }, h("span", { class: "page-dir" }, splitPagePath(page.path)[0]), splitPagePath(page.path)[1]),
     page.stale ? h("span", { class: "page-flag stale", title: t("pages.staleShort") }, "⚠")
       : page.edited ? h("span", { class: "page-flag", title: t("pages.editedShort") }, "●") : null)));
   $("page-list").replaceChildren(...(items.length ? items : [h("li", {}, h("p", { class: "empty" }, t("pages.loading")))]));

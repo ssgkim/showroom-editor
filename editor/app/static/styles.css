@@ -303,7 +303,7 @@ details summary { cursor: pointer; font-size: var(--text-sm); font-weight: 500; 
 }
 .page-head h2 { margin: 0; font: 800 var(--text-lg) var(--font-display); }
 .page-sub { margin: 0.2rem 0 0; font-size: var(--text-sm); color: var(--color-muted); }
-.page-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(200px, 280px) 1fr; }
+.page-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(220px, 300px) 1fr; }
 .page-body nav { overflow: auto; border-right: 1px solid var(--color-line); background: var(--color-paper); }
 .page-list { list-style: none; margin: 0; padding: 0.5rem; display: grid; gap: 2px; }
 .page-pick {
@@ -313,7 +313,9 @@ details summary { cursor: pointer; font-size: var(--text-sm); font-weight: 500; 
 }
 .page-pick:hover { background: var(--color-idle-bg); color: var(--color-ink); }
 .page-pick[aria-current="true"] { background: var(--color-ink); color: var(--color-paper); }
-.page-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.page-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.page-pick .page-dir { color: var(--color-muted); }
+.page-pick[aria-current="true"] .page-dir { color: inherit; opacity: 0.6; }
 .page-flag { color: var(--color-red); }
 .page-flag.stale { color: var(--color-busy); }
 .page-empty { margin: auto; color: var(--color-muted); }
@@ -321,7 +323,7 @@ details summary { cursor: pointer; font-size: var(--text-sm); font-weight: 500; 
 .page-bar { display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; font-size: var(--text-sm); }
 .page-bar code { font-weight: 600; }
 .page-state { color: var(--color-muted); }
-.page-toggle { margin-left: auto; display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer; }
+.page-toggle { margin-left: auto; flex-direction: row; align-items: center; gap: 0.35rem; cursor: pointer; }
 .page-stale {
   margin: 0; padding: 0.55rem 0.8rem; border-left: 3px solid var(--color-busy);
   background: var(--color-busy-bg); font-size: var(--text-sm);
