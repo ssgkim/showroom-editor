@@ -228,6 +228,7 @@ def test_progress_builds_user_by_checkpoint_matrix(monkeypatch):
     monkeypatch.setattr(progress, "editor_state", _state)
     monkeypatch.setattr(progress, "load_overrides", lambda: {"agentops": DEFINITION_WITH_CHECKPOINTS})
     monkeypatch.setattr(progress, "showroom_status", lambda users: {u: "ready" for u in users})
+    monkeypatch.setattr(progress, "_batch_resource_column", lambda *_: None)
     seen = []
 
     def fake_run(check_type, params, ctx):
@@ -253,3 +254,48 @@ def test_showroom_status_reads_all_namespaces_once(monkeypatch):
 
     assert progress.showroom_status(["user1", "user2", "user3"]) == {"user1": "ready", "user2": "starting", "user3": "missing"}
     assert len(calls) == 1
+
+
+def test_batched_resource_column_queries_once_and_matches_each_user(monkeypatch):
+    from app import progress
+
+    column = {"id": "a:0", "check": {"type": "resource", "kind": "Deployment", "namespace": "demo-{{ .user }}",
+                                      "name": "planner-backend", "ready": True}}
+    items = [{"kind": "Deployment", "metadata": {"name": "planner-backend", "namespace": "demo-user1"},
+              "status": {"availableReplicas": 1}},
+             {"kind": "Deployment", "metadata": {"name": "planner-backend", "namespace": "demo-user2"},
+              "status": {"replicas": 1, "availableReplicas": 0}}]
+    calls = []
+    monkeypatch.setattr(progress, "oc_json", lambda args: calls.append(args) or {"items": items})
+
+    cells = progress._batch_resource_column(column, ["user1", "user2", "user3"], "d")
+
+    assert calls == [["get", "Deployment", "-A", "--field-selector", "metadata.name=planner-backend"]]
+    assert [cells[u]["s"] for u in ("user1", "user2", "user3")] == ["done", "todo", "todo"]
+    assert cells["user3"]["o"] == "Deployment/planner-backend (demo-user3) 없음"
+
+
+def test_batched_column_reports_missing_resource_type_once(monkeypatch):
+    from app import progress
+    from app.kube import KubeError
+
+    def missing(args):
+        raise KubeError('the server doesn\'t have a resource type "llminferenceservices"')
+    monkeypatch.setattr(progress, "oc_json", missing)
+    column = {"id": "i:1", "check": {"type": "resource", "kind": "llminferenceservices", "namespace": "user-{{ .userNumber2 }}"}}
+
+    cells = progress._batch_resource_column(column, ["user1"], "d")
+
+    assert cells["user1"]["s"] == "error"
+
+
+def test_batched_cluster_scoped_namespace_uses_user_number(monkeypatch):
+    from app import progress
+
+    items = [{"kind": "Namespace", "metadata": {"name": "user-03"}}]
+    monkeypatch.setattr(progress, "oc_json", lambda args: {"items": items})
+    column = {"id": "i:0", "check": {"type": "resource", "kind": "Namespace", "name": "user-{{ .userNumber2 }}"}}
+
+    cells = progress._batch_resource_column(column, ["user3", "user4"], "d")
+
+    assert cells["user3"]["s"] == "done" and cells["user4"]["s"] == "todo"

@@ -46,6 +46,34 @@ def showroom_status(users: list[str]) -> dict[str, str]:
     return status
 
 
+def _batch_resource_column(column: dict, users: list[str], domain: str) -> dict[str, dict] | None:
+    """사용자마다 이름·네임스페이스만 다른 resource 점검은 한 번 조회해 나눠 판정한다.
+
+    예: demo-{{ .user }} 의 planner-backend → `oc get Deployment -A --field-selector metadata.name=planner-backend`
+    다른 점검이나 labelSelector 를 쓰는 점검은 None 을 돌려 사용자별로 점검한다.
+    """
+    check = column["check"]
+    if check["type"] != "resource" or check.get("labelSelector") or not check.get("kind"):
+        return None
+    name, namespace = check.get("name", ""), check.get("namespace", "")
+    args = ["get", check["kind"], *(["-A"] if namespace else [])]
+    if name and "{{" not in name:
+        args += ["--field-selector", f"metadata.name={name}"]
+    try:
+        items = oc_json(args)["items"]
+    except KubeError as exc:
+        return {user: {"s": "error", "o": str(exc)[:200]} for user in users}
+    cells = {}
+    for user in users:
+        params = checks.Context(domain=domain, user=user).render({k: v for k, v in check.items() if k != "type"})
+        matched = [item for item in items
+                   if (not params.get("namespace") or item["metadata"].get("namespace") == params["namespace"])
+                   and (not params.get("name") or item["metadata"]["name"] == params["name"])]
+        passed, observed = checks.resource_verdict(params, matched)
+        cells[user] = {"s": "done" if passed else "todo", "o": observed}
+    return cells
+
+
 def _check_cell(user: str, column: dict, domain: str) -> tuple[str, str, dict]:
     check = column["check"]
     params = {k: v for k, v in check.items() if k != "type"}
@@ -70,8 +98,16 @@ def run(workshop_id: str, domain: str) -> dict:
 
     cells: dict[str, dict] = {user: {} for user in users}
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
-        futures = [pool.submit(_check_cell, user, column, domain) for user in users for column in columns]
-        for future in futures:
+        batched = {column["id"]: pool.submit(_batch_resource_column, column, users, domain) for column in columns}
+        single = []
+        for column in columns:
+            result = batched[column["id"]].result()
+            if result is None:
+                single += [pool.submit(_check_cell, user, column, domain) for user in users]
+            else:
+                for user, cell in result.items():
+                    cells[user][column["id"]] = cell
+        for future in single:
             user, column_id, cell = future.result()
             cells[user][column_id] = cell
 

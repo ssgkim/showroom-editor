@@ -138,12 +138,17 @@ def check_resource(params: dict, ctx: Context) -> tuple[bool, str]:
         args += ["-n", params["namespace"]]
     if params.get("labelSelector"):
         args += ["-l", params["labelSelector"]]
-    target = f"{kind}/{params.get('name', '*')}" + (f" ({params['namespace']})" if params.get("namespace") else "")
     try:
         obj = oc_json(args, allow_missing=True)
     except KubeError as exc:
         raise CheckError(str(exc)) from exc
-    items = (obj or {}).get("items", [obj] if obj else [])
+    return resource_verdict(params, (obj or {}).get("items", [obj] if obj else []))
+
+
+def resource_verdict(params: dict, items: list[dict]) -> tuple[bool, str]:
+    """이미 조회한 리소스 목록으로 resource 점검을 판정한다 (진행 현황에서 한 번에 조회할 때도 쓴다)."""
+    kind = params["kind"]
+    target = f"{kind}/{params.get('name', '*')}" + (f" ({params['namespace']})" if params.get("namespace") else "")
     if not items:
         return False, f"{target} 없음"
     if params.get("ready"):
