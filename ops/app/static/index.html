@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Workshop Ops Hub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@500;700;900&family=Red+Hat+Text:wght@400;500;700&family=Red+Hat+Mono:wght@400;500&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div>
+        <h1>Workshop Ops Hub</h1>
+        <p class="brand-sub" data-i18n="brand.sub"></p>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <dl class="cluster">
+        <div><dt data-i18n="cluster.label"></dt><dd id="cluster-domain">—</dd></div>
+      </dl>
+      <div class="lang-switch" role="group" aria-label="Language">
+        <button type="button" data-lang="ko">한국어</button>
+        <button type="button" data-lang="en">English</button>
+      </div>
+    </div>
+  </header>
+  <nav class="hub-nav" aria-label="Sections">
+    <button type="button" aria-current="page" data-i18n="nav.preflight"></button>
+    <button type="button" disabled><span data-i18n="nav.gallery"></span><span class="soon" data-i18n="nav.soon"></span></button>
+    <button type="button" disabled><span data-i18n="nav.progress"></span><span class="soon" data-i18n="nav.soon"></span></button>
+  </nav>
+
+  <main class="layout ops-layout">
+    <section class="panel" aria-labelledby="ws-heading">
+      <header class="panel-head">
+        <p class="step">01</p>
+        <h2 id="ws-heading" data-i18n="ws.heading"></h2>
+        <p class="panel-desc" data-i18n="ws.desc"></p>
+      </header>
+      <ul id="workshop-list" class="pick-list"></ul>
+
+      <header class="panel-head">
+        <p class="step">02</p>
+        <h2 data-i18n="def.heading"></h2>
+        <p class="panel-desc" data-i18n="def.desc"></p>
+      </header>
+      <ul id="definition-list" class="pick-list"></ul>
+      <form id="def-editor" class="def-editor" hidden>
+        <h3 id="def-editor-title"></h3>
+        <textarea name="text" spellcheck="false" aria-labelledby="def-editor-title"></textarea>
+        <p class="error" id="def-error" role="alert"></p>
+        <div class="actions">
+          <button type="submit" class="btn btn-ink" data-i18n="def.save"></button>
+          <button type="button" class="btn btn-text danger" id="btn-def-reset" data-i18n="def.reset"></button>
+          <button type="button" class="btn btn-text" id="btn-def-close" data-i18n="def.close"></button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel panel-composer" aria-labelledby="run-heading">
+      <header class="panel-head">
+        <p class="step">03</p>
+        <h2 id="run-heading" data-i18n="run.heading"></h2>
+        <p class="panel-desc" data-i18n="run.desc"></p>
+      </header>
+      <div id="run-area"></div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/static/i18n.js" defer></script>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

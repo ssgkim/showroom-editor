@@ -1,7 +1,8 @@
 .git/
 .gitignore
 bootstrap/
-README.md
-editor/
-scripts/
 docs/
+editor/
+ops/
+README.md
+scripts/

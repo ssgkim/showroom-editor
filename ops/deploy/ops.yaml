@@ -1,0 +1,192 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: workshop-ops
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: workshop-ops
+  namespace: workshop-ops
+  annotations:
+    serviceaccounts.openshift.io/oauth-redirectreference.primary: >-
+      {"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"workshop-ops"}}
+---
+# 클러스터 전체 읽기 전용 (Operator, 노드, Pod, Keycloak 계정 등 점검용)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: workshop-ops-cluster-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-reader
+subjects:
+  - kind: ServiceAccount
+    name: workshop-ops
+    namespace: workshop-ops
+---
+# oauth-proxy 가 로그인 사용자의 권한(SAR)을 확인하는 데 필요하다
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: workshop-ops-auth-delegator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: workshop-ops
+    namespace: workshop-ops
+---
+# 자기 네임스페이스의 덮어쓰기 정의(ConfigMap)만 쓸 수 있다
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: workshop-ops-overrides
+  namespace: workshop-ops
+rules:
+  - apiGroups: [""]
+    resources: [configmaps]
+    verbs: [get, list, create, patch, update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: workshop-ops-overrides
+  namespace: workshop-ops
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: workshop-ops-overrides
+subjects:
+  - kind: ServiceAccount
+    name: workshop-ops
+    namespace: workshop-ops
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: workshop-ops
+  namespace: workshop-ops
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: workshop-ops
+  namespace: workshop-ops
+spec:
+  source:
+    type: Git
+    git:
+      uri: https://github.com/ssgkim/showroom-editor.git
+      ref: main
+    binary: null
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: ops/Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: workshop-ops:latest
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workshop-ops
+  namespace: workshop-ops
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: workshop-ops
+  template:
+    metadata:
+      labels:
+        app: workshop-ops
+    spec:
+      serviceAccountName: workshop-ops
+      containers:
+        - name: ops
+          image: image-registry.openshift-image-registry.svc:5000/workshop-ops/workshop-ops:latest
+          imagePullPolicy: Always
+          env:
+            - name: OPS_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: EDITOR_NAMESPACE
+              value: showroom-editor
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet: {path: /healthz, port: 8080}
+          livenessProbe:
+            httpGet: {path: /healthz, port: 8080}
+            initialDelaySeconds: 10
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {cpu: "1", memory: 512Mi}
+        - name: oauth-proxy
+          image: image-registry.openshift-image-registry.svc:5000/openshift/oauth-proxy:v4.4
+          args:
+            - --provider=openshift
+            - --https-address=:8443
+            - --http-address=
+            - --upstream=http://localhost:8080
+            - --tls-cert=/etc/tls/private/tls.crt
+            - --tls-key=/etc/tls/private/tls.key
+            - --cookie-secret-file=/etc/proxy/secrets/session_secret
+            - --openshift-service-account=workshop-ops
+            # Showroom Editor 를 쓸 수 있는 사용자(같은 기준)만 허용
+            - '--openshift-sar={"namespace":"showroom-editor","resource":"services","verb":"get"}'
+          ports:
+            - containerPort: 8443
+              name: https
+          readinessProbe:
+            httpGet: {path: /oauth/healthz, port: 8443, scheme: HTTPS}
+          volumeMounts:
+            - {name: tls, mountPath: /etc/tls/private}
+            - {name: proxy-secret, mountPath: /etc/proxy/secrets}
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 200m, memory: 128Mi}
+      volumes:
+        - name: tls
+          secret:
+            secretName: workshop-ops-tls
+        - name: proxy-secret
+          secret:
+            secretName: workshop-ops-proxy
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: workshop-ops
+  namespace: workshop-ops
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: workshop-ops-tls
+spec:
+  selector:
+    app: workshop-ops
+  ports:
+    - name: https
+      port: 8443
+      targetPort: https
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: workshop-ops
+  namespace: workshop-ops
+spec:
+  to:
+    kind: Service
+    name: workshop-ops
+  port:
+    targetPort: https
+  tls:
+    termination: reencrypt
+    insecureEdgeTerminationPolicy: Redirect
