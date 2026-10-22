@@ -1,0 +1,90 @@
+# 대상 클러스터 (필수). Showroom Editor 는 클러스터에서 자동으로 읽어 채운다.
+#   domain: oc get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}'
+#   apiUrl: oc get infrastructure cluster -o jsonpath='{.status.apiServerURL}'
+cluster:
+  domain: ""
+  apiUrl: ""
+
+# user1 ~ user20 → 네임스페이스 showroom-userN, 주소 https://showroom-showroom-userN.<domain>
+users:
+  prefix: user
+  start: 1
+  count: 20
+
+namespacePrefix: showroom-
+
+# 사용자 네임스페이스에 추가할 레이블 (Showroom Editor가 미리보기/배포를 구분하는 데 쓴다)
+namespaceLabels: {}
+
+# 등록된 워크샵 콘텐츠. 클러스터의 Application(showroom-gitops) spec.source.helm.valuesObject.contents 에
+# scripts/showroom-content.sh 또는 OpenShift 콘솔로 등록한다. 비어 있으면 Showroom을 만들지 않는다.
+#
+# contents:
+#   agentops:                                   # Antora 컴포넌트 이름이자 URL 경로(/agentops/main/...)
+#     repoUrl: https://github.com/ssgkim/rhoai-basic-agentops-workshop.git   # 필수
+#     repoRef: main                             # 기본 main
+#     title: Basic AgentOps on Red Hat AI       # 기본: 이름
+#     startPath: content                        # 기본 content (antora.yml 위치)
+#     order: 20                                 # 홈 목록 순서, 기본 100
+#     tabs:                                     # ui.tabs 뒤에 추가
+#       - name: MLflow Console
+#         url: "https://mlflow-server.{{ .domain }}/"
+#         external: true
+#     attributes:                               # 이 콘텐츠에만 주입할 Antora 속성
+#       demo-ns: "demo-{{ .user }}"
+contents: {}
+
+# 통합 Antora 사이트
+site:
+  title: Red Hat AI Workshop
+  uiBundleUrl: https://github.com/rhpds/rhdp_showroom_theme/releases/download/latest/ui-bundle.zip
+
+# Showroom(nookbag) 화면. 모듈별 tabs는 이 목록 뒤에 이름 중복 없이 추가된다.
+# OpenShift Console 등은 X-Frame-Options: DENY 이므로 external(새 창)로 연다.
+ui:
+  defaultWidth: 30
+  tabs:
+    - name: OpenShift AI Dashboard
+      url: "https://data-science-gateway.{{ .domain }}/"
+      external: true
+    - name: OpenShift Console
+      url: "https://console-openshift-console.{{ .domain }}"
+      external: true
+
+# 모든 모듈에 주입되는 Antora 속성. 모듈의 attributes가 같은 키를 덮어쓴다.
+# 값은 tpl로 렌더링되며 .domain, .apiUrl, .user 를 사용할 수 있다.
+commonAttributes:
+  guid: "{{ .user }}"
+  user: "{{ .user }}"
+  # 사용자별 비밀번호는 Git에 두지 않는다
+  password: "<안내받은 비밀번호>"
+  openshift_cluster_ingress_domain: "{{ .domain }}"
+  openshift_api_url: "{{ .apiUrl }}"
+  openshift_cluster_console_url: "https://console-openshift-console.{{ .domain }}"
+  rhoai_dashboard_url: "https://data-science-gateway.{{ .domain }}/"
+  page-openshift_cluster_console_url: "https://console-openshift-console.{{ .domain }}"
+  page-rhoai_dashboard_url: "https://data-science-gateway.{{ .domain }}/"
+  login_command: "oc login -u {{ .user }} {{ .apiUrl }}"
+
+images:
+  gitCloner: quay.io/rhpds/git-cloner:v1.1.5
+  antora: quay.io/rhpds/antora:v1.3.0
+  content: quay.io/rhpds/showroom-content:v1.4.3
+
+nookbagBundle: https://github.com/rhpds/nookbag/releases/download/nookbag-v0.5.1/nookbag-v0.5.1.zip
+
+resources:
+  build:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  content:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi

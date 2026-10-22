@@ -1,0 +1,6 @@
+apiVersion: v2
+name: showroom-gitops
+description: 등록된 워크샵 콘텐츠 모듈(contents/*)을 하나의 Antora 사이트로 통합해 사용자별 Showroom으로 배포한다
+type: application
+version: 0.2.0
+appVersion: "1.0.0"

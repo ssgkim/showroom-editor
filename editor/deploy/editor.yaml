@@ -1,0 +1,183 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: showroom-editor
+---
+# OpenShift 로그인(oauth-proxy) 클라이언트로도 쓰인다
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: showroom-editor
+  namespace: showroom-editor
+  annotations:
+    serviceaccounts.openshift.io/oauth-redirectreference.primary: >-
+      {"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"showroom-editor"}}
+---
+# 사용자 Showroom 네임스페이스와 그 안의 리소스를 만들고 지울 수 있는 권한
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: showroom-editor
+rules:
+  - apiGroups: [""]
+    resources: [namespaces, configmaps, services, pods]
+    verbs: [get, list, watch, create, patch, update, delete]
+  - apiGroups: [""]
+    resources: [pods/log]
+    verbs: [get]
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [get, list, watch, create, patch, update, delete]
+  - apiGroups: [route.openshift.io]
+    resources: [routes]
+    verbs: [get, list, watch, create, patch, update, delete]
+  - apiGroups: [config.openshift.io]
+    resources: [ingresses, infrastructures]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: showroom-editor
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: showroom-editor
+subjects:
+  - kind: ServiceAccount
+    name: showroom-editor
+    namespace: showroom-editor
+---
+# oauth-proxy 가 로그인 사용자의 권한(SAR)을 확인하는 데 필요하다
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: showroom-editor-auth-delegator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: showroom-editor
+    namespace: showroom-editor
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: showroom-editor
+  namespace: showroom-editor
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: showroom-editor
+  namespace: showroom-editor
+spec:
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: editor/Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: showroom-editor:latest
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: showroom-editor
+  namespace: showroom-editor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: showroom-editor
+  template:
+    metadata:
+      labels:
+        app: showroom-editor
+    spec:
+      serviceAccountName: showroom-editor
+      containers:
+        - name: editor
+          image: image-registry.openshift-image-registry.svc:5000/showroom-editor/showroom-editor:latest
+          imagePullPolicy: Always
+          env:
+            - name: EDITOR_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet: {path: /healthz, port: 8080}
+          livenessProbe:
+            httpGet: {path: /healthz, port: 8080}
+            initialDelaySeconds: 10
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {cpu: "1", memory: 512Mi}
+        - name: oauth-proxy
+          image: image-registry.openshift-image-registry.svc:5000/openshift/oauth-proxy:v4.4
+          args:
+            - --provider=openshift
+            - --https-address=:8443
+            - --http-address=
+            - --upstream=http://localhost:8080
+            - --tls-cert=/etc/tls/private/tls.crt
+            - --tls-key=/etc/tls/private/tls.key
+            - --cookie-secret-file=/etc/proxy/secrets/session_secret
+            - --openshift-service-account=showroom-editor
+            # showroom-editor 네임스페이스의 services 를 볼 수 있는 사용자(관리자, 인스트럭터 그룹)만 허용
+            - '--openshift-sar={"namespace":"showroom-editor","resource":"services","verb":"get"}'
+          ports:
+            - containerPort: 8443
+              name: https
+          readinessProbe:
+            httpGet: {path: /oauth/healthz, port: 8443, scheme: HTTPS}
+          volumeMounts:
+            - {name: tls, mountPath: /etc/tls/private}
+            - {name: proxy-secret, mountPath: /etc/proxy/secrets}
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 200m, memory: 128Mi}
+      volumes:
+        - name: tls
+          secret:
+            secretName: showroom-editor-tls
+        - name: proxy-secret
+          secret:
+            secretName: showroom-editor-proxy
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: showroom-editor
+  namespace: showroom-editor
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: showroom-editor-tls
+spec:
+  selector:
+    app: showroom-editor
+  ports:
+    - name: https
+      port: 8443
+      targetPort: https
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: showroom-editor
+  namespace: showroom-editor
+spec:
+  to:
+    kind: Service
+    name: showroom-editor
+  port:
+    targetPort: https
+  tls:
+    termination: reencrypt
+    insecureEdgeTerminationPolicy: Redirect

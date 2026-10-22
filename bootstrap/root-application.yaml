@@ -1,0 +1,27 @@
+# 최초 1회만 적용: oc apply -f bootstrap/root-application.yaml
+# 콘텐츠는 이 Application 의 spec.source.helm.valuesObject.contents 에 등록한다 (scripts/showroom-content.sh).
+# 등록된 콘텐츠가 없으면 Showroom 은 만들어지지 않는다.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: showroom-gitops
+  namespace: openshift-gitops
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ssgkim/showroom-editor.git
+    targetRevision: main
+    path: .
+    helm:
+      valuesObject:
+        # 적용 전에 대상 클러스터 값으로 바꾼다
+        cluster:
+          domain: apps.CHANGE-ME.example.com
+          apiUrl: https://api.CHANGE-ME.example.com:6443
+        contents: {}
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

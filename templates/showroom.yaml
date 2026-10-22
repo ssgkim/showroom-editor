@@ -1,0 +1,132 @@
+{{- $modules := (include "showroom.modules" . | fromJson).items }}
+{{- if $modules }}
+{{- $_ := required "cluster.domain 을 지정하세요 (예: apps.mycluster.example.com)" .Values.cluster.domain }}
+{{- $_ := required "cluster.apiUrl 을 지정하세요 (예: https://api.mycluster.example.com:6443)" .Values.cluster.apiUrl }}
+{{- range $i := until (int $.Values.users.count) }}
+{{- $user := printf "%s%d" $.Values.users.prefix (add (int $.Values.users.start) $i) }}
+{{- $ns := printf "%s%s" $.Values.namespacePrefix $user }}
+{{- /* tpl 컨텍스트: tpl은 .Template 이 있어야 동작한다 */}}
+{{- $ctx := dict "domain" $.Values.cluster.domain "apiUrl" $.Values.cluster.apiUrl "user" $user "Template" $.Template }}
+{{- $args := dict "root" $ "modules" $modules "ctx" $ctx }}
+{{- $uiConfig := include "showroom.uiConfig" $args }}
+{{- $siteData := include "showroom.siteData" $args }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: showroom-gitops
+    workshop-user: {{ $user }}
+    {{- with $.Values.namespaceLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: showroom-site
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: showroom-gitops
+data:
+  {{- $siteData | nindent 2 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: showroom
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/name: showroom
+    app.kubernetes.io/part-of: showroom-gitops
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: showroom
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: showroom
+      annotations:
+        # 모듈 등록/해제·속성·스크립트·탭 변경 시 재빌드
+        checksum/site: {{ printf "%s%s" $siteData $uiConfig | sha256sum }}
+    spec:
+      initContainers:
+        - name: clone
+          image: {{ $.Values.images.gitCloner }}
+          command: ["sh", "/config/clone.sh"]
+          volumeMounts: &mounts
+            - {name: config, mountPath: /config}
+            - {name: work, mountPath: /showroom/repo, subPath: repo}
+            - {name: work, mountPath: /showroom/sources, subPath: sources}
+            - {name: work, mountPath: /showroom/www, subPath: www}
+          resources:
+            {{- toYaml $.Values.resources.build | nindent 12 }}
+        - name: build
+          image: {{ $.Values.images.antora }}
+          command: ["bash", "/config/build.sh"]
+          volumeMounts: *mounts
+          resources:
+            {{- toYaml $.Values.resources.build | nindent 12 }}
+      containers:
+        - name: content
+          image: {{ $.Values.images.content }}
+          env:
+            - {name: ANTORA_PLAYBOOK, value: site.yml}
+            - {name: ZT_UI_ENABLED, value: "true"}
+            - {name: ZT_BUNDLE, value: {{ $.Values.nookbagBundle | quote }}}
+            - name: SHOWROOM_UI_CONFIG
+              value: |
+                {{- $uiConfig | nindent 16 }}
+          ports:
+            - {name: http, containerPort: 8000}
+          readinessProbe:
+            httpGet: {path: /, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /, port: http}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          volumeMounts:
+            - {name: work, mountPath: /showroom/repo, subPath: repo}
+            - {name: work, mountPath: /showroom/www, subPath: www}
+          resources:
+            {{- toYaml $.Values.resources.content | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: showroom-site
+        - name: work
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: showroom
+  namespace: {{ $ns }}
+spec:
+  selector:
+    app.kubernetes.io/name: showroom
+  ports:
+    - {name: http, port: 8080, targetPort: http}
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: showroom
+  namespace: {{ $ns }}
+spec:
+  to:
+    kind: Service
+    name: showroom
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+{{- end }}
+{{- end }}
