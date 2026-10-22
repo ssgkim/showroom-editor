@@ -83,6 +83,8 @@ function renderGallery() {
   document.querySelectorAll("[data-gallery-filter]").forEach((button) =>
     button.setAttribute("aria-pressed", String(button.dataset.galleryFilter === gallery.filter)));
   const cards = gallery.cards.filter((card) => gallery.filter === "all" || card.workshops.some((w) => w.deployed));
+  // 카드가 3개 이상일 때만 배포 중인 첫 카드를 넓게 보여 준다
+  $("gallery-grid").classList.toggle("has-feature", cards.length >= 3);
   $("gallery-grid").replaceChildren(...(cards.length ? cards.map(galleryCard)
     : [h("p", { class: "placeholder-card" }, t("gallery.empty"))]));
 }

@@ -87,6 +87,7 @@ const MESSAGES = {
     "progress.showroom.unknown": "Showroom 상태 알 수 없음",
     "progress.notDeployed": "이 워크샵은 지금 배포되어 있지 않습니다. 결과는 참고용입니다.",
     "progress.pick": "워크샵을 고르세요.",
+    "progress.columnFailed": "{name}: 모든 사용자에서 확인하지 못했습니다 — {reason}",
 
     "ws.heading": "워크샵",
     "ws.desc": "Showroom Editor 에 저장된 워크샵입니다.",
@@ -188,6 +189,7 @@ const MESSAGES = {
     "progress.showroom.unknown": "Showroom status unknown",
     "progress.notDeployed": "This workshop is not deployed right now. Results are for reference only.",
     "progress.pick": "Pick a workshop.",
+    "progress.columnFailed": "{name}: could not be checked for any user — {reason}",
 
     "ws.heading": "Workshops",
     "ws.desc": "Workshops saved in Showroom Editor.",

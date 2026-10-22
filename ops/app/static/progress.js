@@ -132,6 +132,14 @@ function matrix(result) {
   return h("div", { class: "matrix-wrap" }, h("table", { class: "matrix" }, head, body));
 }
 
+/** 모든 사용자가 확인 실패인 열은 공통 원인(예: CRD 없음)이므로 표 위에 한 번 알린다. */
+function failedColumnNotes(result) {
+  return result.columns
+    .filter((column) => result.rows.length && result.rows.every((row) => row.cells[column.id].s === "error"))
+    .map((column) => h("p", { class: "verdict", "data-v": "caution" },
+      t("progress.columnFailed", { name: `${column.content} · M${column.module} ${column.name}`, reason: result.rows[0].cells[column.id].o })));
+}
+
 function renderProgress() {
   renderRunButton();
   const area = $("progress-area");
@@ -147,6 +155,7 @@ function renderProgress() {
     summaryTiles(result),
     result.columns.length ? columnBars(result) : null,
     missing.length ? h("p", { class: "empty" }, t("progress.noCheckpoints", { names: missing.join(", ") })) : null,
+    ...failedColumnNotes(result),
     result.columns.length ? matrix(result) : null,
     result.columns.length ? h("p", { class: "legend" }, t("progress.legend")) : null,
   ].filter(Boolean));

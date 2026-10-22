@@ -348,7 +348,7 @@ details summary { cursor: pointer; font-size: var(--text-sm); font-weight: 500; 
 .app-switch:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 
 /* ── 공통: 넓은 화면(갤러리 · 진행 현황) ─────────────────────────────── */
-.view-wide { padding: clamp(1rem, 3vw, 2.5rem); max-width: 1600px; margin: 0 auto; }
+.view-wide { display: block; width: 100%; padding: clamp(1rem, 3vw, 2.5rem); max-width: 1600px; margin: 0 auto; }
 .view-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem 2rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
 .view-head h2 { margin: 0; font: 900 var(--text-xl)/1.1 var(--font-display); letter-spacing: -0.01em; }
 .view-head .panel-desc { margin: 0.35rem 0 0; max-width: 60ch; }
@@ -369,11 +369,11 @@ details summary { cursor: pointer; font-size: var(--text-sm); font-weight: 500; 
 }
 .g-card:hover { transform: translateY(-2px); border-color: var(--color-ink-soft); }
 .g-card.is-live { border-top: 4px solid var(--color-red); }
-@media (min-width: 1100px) { .g-card.is-live:first-child { grid-column: span 2; } }
+@media (min-width: 1100px) { .gallery-grid.has-feature .g-card.is-live:first-child { grid-column: span 2; } }
 .g-card-head { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .g-name { font: 600 var(--text-sm) var(--font-mono); color: var(--color-red); margin-right: auto; }
 .g-title { margin: 0; font: 800 var(--text-lg)/1.25 var(--font-display); }
-.g-card.is-live:first-child .g-title { font-size: var(--text-xl); }
+.gallery-grid.has-feature .g-card.is-live:first-child .g-title { font-size: var(--text-xl); }
 .g-summary { margin: 0; color: var(--color-ink-soft); }
 .g-summary.muted { font-size: var(--text-sm); }
 .readiness { font: 700 0.68rem var(--font-text); padding: 0.15rem 0.55rem; border-radius: 999px; background: var(--color-idle-bg); color: var(--color-muted); }
