@@ -249,3 +249,80 @@ oc create configmap showroom-editor-state -n showroom-editor \
 ```
 
 > 백업 파일의 미리보기·배포 기록은 원래 클러스터 기준입니다. 다른 클러스터에서는 워크샵을 다시 미리보기·배포하세요.
+
+---
+
+## 13. Workshop Ops Hub: 사전 점검
+
+행사 전에 **이 클러스터에서 워크샵을 진행할 수 있는지** 자동으로 확인하는 별도 사이트입니다.
+Showroom Editor 에 저장된 워크샵을 그대로 읽고, 클러스터는 **읽기만** 합니다.
+
+### 설치
+
+```bash
+curl -sL https://raw.githubusercontent.com/ssgkim/showroom-editor/main/ops/deploy.sh | bash
+```
+
+- 주소: `https://workshop-ops-workshop-ops.<클러스터 도메인>`
+- 접근 권한은 Showroom Editor 와 같습니다(`showroom-editor` 네임스페이스 view 권한).
+- Showroom Editor 가 먼저 설치되어 있어야 합니다.
+
+### 사용
+
+1. 왼쪽 **워크샵**에서 점검할 워크샵을 고릅니다(배포 중인 워크샵이 기본 선택).
+2. **워크샵 정의**에서 콘텐츠별 정의 상태를 확인합니다.
+
+   | 표시 | 의미 |
+   |---|---|
+   | 저장소 | 콘텐츠 저장소 루트의 `workshop.yaml` 을 사용 |
+   | 덮어씀 | Ops Hub 에서 편집한 정의를 사용 (저장소 파일보다 우선) |
+   | 정의 없음 | 요구 사항 점검을 건너뜀. **편집**을 누르면 예시가 채워진 편집기가 열림 |
+   | 오류 | 정의 파일 형식 오류. 편집기에서 내용 확인 |
+
+3. **지금 점검** → 결과가 공통 / 콘텐츠별로 표시됩니다. 실패·경고 항목에는 **조치** 안내가 붙습니다.
+4. **보고서 내려받기 (.md)** 로 행사 준비 체크리스트를 저장합니다.
+
+| 판정 | 의미 |
+|---|---|
+| 준비 완료 (초록) | 모든 필수 항목 통과 |
+| 진행 가능 (노랑) | 필수는 통과, 권장 항목 경고나 점검 불가 항목 있음 |
+| 준비 안 됨 (빨강) | 필수 항목 실패 |
+
+공통 점검(정의 없이 항상 실행): 사용자 계정(Keycloak, 없으면 OpenShift 사용자), Showroom 용 여유 자원(사용자당 CPU 100m · 메모리 256Mi), quay.io 접근, 콘텐츠 저장소 접근.
+
+> 점검 결과는 Ops Hub 가 재시작되면 사라집니다(다시 점검). 덮어쓴 정의는 `workshop-ops` 네임스페이스의 ConfigMap `workshop-ops-overrides` 에 저장되어 유지됩니다.
+
+### 워크샵 정의 (`workshop.yaml`) 작성법
+
+콘텐츠 저장소 **루트**에 두거나 Ops Hub 편집기에 입력합니다.
+
+```yaml
+about:                        # 2차(갤러리)에서 사용
+  summary: AI 앱을 배포하고 로그·트레이스·GPU 지표로 관찰합니다.
+  audience: ML 엔지니어
+  duration: 90m
+  level: intermediate
+requirements:                # 사전 점검 항목
+  - name: OpenShift AI 3.5 이상
+    check: { type: operator, package: rhods-operator, minVersion: "3.5" }
+    fix: OperatorHub 에서 Red Hat OpenShift AI 를 설치하세요
+  - name: GPU 노드
+    check: { type: gpuNodes, min: 1 }
+    severity: recommended     # 실패해도 경고(⚠️). 기본은 required(❌)
+    fix: "GPU 워커 노드를 추가하세요"
+checkpoints: []              # 3차(진행 현황)에서 사용
+```
+
+| check.type | 필드 | 확인 내용 |
+|---|---|---|
+| `operator` | `package`, `minVersion` | Operator 설치 완료(CSV Succeeded)와 버전. 설치가 멈춘 경우(예: BundleUnpackFailed) 원인을 표시 |
+| `clusterVersion` | `min` | OpenShift 버전 |
+| `gpuNodes` | `min`, `resource`(기본 `nvidia.com/gpu`) | GPU 를 할당할 수 있는 노드 수 |
+| `resource` | `kind`, `name`, `namespace`, `labelSelector`, `ready` | 리소스 존재 / Ready 여부 |
+| `http` | `url`, `expect`(기본 200·301·302·401·403) | 엔드포인트 응답 코드 (인증서 검증 안 함) |
+| `capacity` | `users`, `cpuPerUser`, `memoryPerUser` | 워커 노드 여유 자원 |
+
+- 값에 `{{ .domain }}` 을 쓸 수 있습니다(`checkpoints` 에서는 `{{ .user }}` 도).
+- 정해진 점검 유형만 실행되며 임의 명령은 실행할 수 없습니다.
+- YAML 값에 `: ` (콜론+공백)이 들어가면 따옴표로 감싸세요.
+- API 서버 주소는 루트(`/`)가 404 인 경우가 많습니다. 상태 확인 경로를 쓰세요(예: MaaS `https://maas.{{ .domain }}/maas-api/health`, `expect: [200]`).

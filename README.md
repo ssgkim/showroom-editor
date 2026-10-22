@@ -45,11 +45,25 @@ PC 에는 `oc` 만 있으면 된다. 클러스터가 이 GitHub 저장소를 직
 5. 실패한 사용자는 상태 칩을 누르면 빌드 로그(clone, build)를 볼 수 있다.
 6. 콘텐츠 저장소 본문만 바뀐 경우 "전체 재시작"으로 다시 빌드한다.
 
+## Workshop Ops Hub (인스트럭터용, 사전 점검)
+
+행사 전에 클러스터가 워크샵을 진행할 수 있는지 자동으로 점검하는 별도 사이트. Showroom Editor 의 워크샵을 읽고, 클러스터는 읽기만 한다.
+
+```bash
+curl -sL https://raw.githubusercontent.com/ssgkim/showroom-editor/main/ops/deploy.sh | bash
+```
+
+- 공통 점검(사용자 계정, 여유 자원, 레지스트리, 콘텐츠 저장소) + 콘텐츠별 요구 사항(`workshop.yaml` 또는 Ops Hub 에서 덮어쓴 정의)
+- 결과 보고서(.md) 내려받기, 한국어/영어
+- 사용법과 `workshop.yaml` 작성법: [docs/manual.md 13장](docs/manual.md#13-workshop-ops-hub-사전-점검)
+- 갤러리, 진행 현황은 다음 단계에서 추가
+
 ## 구조
 
 ```text
 Chart.yaml, values.yaml, templates/, files/   통합 Antora Showroom 차트 (사용자별 리소스 생성)
 editor/                                       Showroom Editor
+ops/                                          Workshop Ops Hub (사전 점검, 같은 구조: app/ deploy/ deploy.sh tests/)
   app/          FastAPI 백엔드 + 정적 화면
   deploy/       에디터 배포 매니페스트 (oauth-proxy, RBAC, BuildConfig)
   deploy.sh     빌드·배포 스크립트
