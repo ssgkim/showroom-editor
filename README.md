@@ -18,9 +18,15 @@
 
 ```bash
 oc login <API 주소>
-./editor/deploy.sh
+curl -sL https://raw.githubusercontent.com/ssgkim/showroom-editor/main/editor/deploy.sh | bash
 ```
 
+PC 에는 `oc` 만 있으면 된다. 클러스터가 이 GitHub 저장소를 직접 가져와 이미지를 빌드한다(3~5분).
+
+- 다른 브랜치/태그: `... | SHOWROOM_EDITOR_REF=v1.0 bash`
+- 포크한 저장소: `... | SHOWROOM_EDITOR_REPO=myorg/showroom-editor bash`
+- 로컬에서 고친 코드로 빌드(개발): 저장소 안에서 `./editor/deploy.sh --local`
+- 업데이트: 같은 명령을 다시 실행한다. 카탈로그와 워크샵 구성은 유지된다.
 - 주소: `https://showroom-editor-showroom-editor.<cluster domain>` (OpenShift 계정으로 로그인)
 - 접근 허용: `showroom-editor` 네임스페이스의 services 를 볼 수 있는 사용자. cluster-admin 은 기본 허용이고, 인스트럭터 그룹은 다음과 같이 추가한다.
 

@@ -68,6 +68,7 @@ metadata:
   name: showroom-editor
   namespace: showroom-editor
 ---
+# GitHub 저장소를 클러스터가 직접 가져와 빌드한다 (deploy.sh 가 uri/ref 를 덮어쓸 수 있다)
 apiVersion: build.openshift.io/v1
 kind: BuildConfig
 metadata:
@@ -75,7 +76,10 @@ metadata:
   namespace: showroom-editor
 spec:
   source:
-    type: Binary
+    type: Git
+    git:
+      uri: https://github.com/ssgkim/showroom-editor.git
+      ref: main
   strategy:
     type: Docker
     dockerStrategy:
